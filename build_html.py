@@ -223,17 +223,19 @@ for t in consolidated_lines:
             father = f_match.group(1)
             father = re.sub(r'^(号|字|名)', '', father)
             
-        is_female_line = bool(re.search(r'(?:之女|公之女|公长女|公次女|公三女|公四女|生女|育女|大女|长女|次女|三女|四女|女一|女二|女三|女四|二女|三女|四女)', detail.split('。')[0]))
-        gender = 'female' if is_female_line else 'male'
-            
-        if clean_name == '祥龙' and gen == 31:
-            if '江宗泽' not in detail and '宗泽' not in detail:
-                detail += '。子一：宗泽，2023年生。'
-                daughters, daughters_info = extract_daughters_rich(detail)
-                exp_count, inline_children = extract_inline_children(detail)
-        
         clean_name = clean_child_name(name.replace('公', ''))
         name = clean_name
+
+        is_female_line = bool(re.search(r'(?:之女|公之女|公长女|公次女|公三女|公四女|生女|育女|大女|长女|次女|三女|四女|女一|女二|女三|女四|二女|三女|四女)', detail.split('。')[0]))
+        gender = 'female' if is_female_line else 'male'
+
+        if clean_name == '祥龙' and gen == 31:
+            if '江宗泽' not in detail and '宗泽' not in detail:
+                detail += '。子一：宗泽，生于2023年。'
+
+        clean_wife, full_wife = extract_wife(detail)
+        daughters, daughters_info = extract_daughters_rich(detail)
+        exp_count, inline_children = extract_inline_children(detail)
             
         if not clean_name or clean_name in invalid_child_words or clean_name in ('于', '？', '日', '代', '世', '电大', '次', '长'):
             continue
