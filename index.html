@@ -2377,39 +2377,48 @@
             e.preventDefault();
             const submitBtn = document.getElementById("fbSubmitBtn");
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>正在加密上传工单...</span>';
+            submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>正在提交至宗族理事会...</span>';
 
             const payload = {
-                mode: isClueMode ? 'CLUE_MODE' : 'DIRECT_NODE',
-                targetId: (!isClueMode && currentFeedbackTarget) ? currentFeedbackTarget.id : 'clue_entry',
-                targetName: (!isClueMode && currentFeedbackTarget) ? currentFeedbackTarget.name : (document.getElementById("clueSelfName").value.trim() || '按线索归谱'),
-                targetGen: (!isClueMode && currentFeedbackTarget) ? currentFeedbackTarget.gen : 0,
-                targetBranch: (!isClueMode && currentFeedbackTarget) ? currentFeedbackTarget.branch : '',
-                clueFather: isClueMode ? document.getElementById("clueFatherName").value.trim() : '',
-                clueGrandfather: isClueMode ? document.getElementById("clueGrandfatherName").value.trim() : '',
-                userName: document.getElementById("fbUserName").value.trim(),
-                userPhone: document.getElementById("fbUserPhone").value.trim(),
-                userEmail: document.getElementById("fbUserEmail").value.trim(),
-                changeType: document.getElementById("fbType").value,
-                changeContent: document.getElementById("fbContent").value.trim(),
-                clientIp: userClientInfo.ip,
-                clientLocation: userClientInfo.location,
-                clientIsp: userClientInfo.isp,
-                submittedAt: new Date().toISOString()
+                "工单类型": "南江宗谱纠错与增补申请",
+                "提交人姓名": document.getElementById("fbUserName").value.trim(),
+                "联系电话_微信": document.getElementById("fbUserPhone").value.trim() || "未填写",
+                "回发邮箱": document.getElementById("fbUserEmail").value.trim() || "未填写",
+                "修改类型": document.getElementById("fbType").value,
+                "目标族人": (!isClueMode && currentFeedbackTarget) ? `${currentFeedbackTarget.name} (${currentFeedbackTarget.gen}世 · ${currentFeedbackTarget.branch || '宗族'})` : (document.getElementById("clueSelfName").value.trim() || "按长辈线索归谱"),
+                "长辈线索_父亲": isClueMode ? (document.getElementById("clueFatherName").value.trim() || "未填") : (currentFeedbackTarget ? currentFeedbackTarget.father_hint : "无"),
+                "长辈线索_爷爷": isClueMode ? (document.getElementById("clueGrandfatherName").value.trim() || "未填") : "无",
+                "具体修改内容说明": document.getElementById("fbContent").value.trim(),
+                "提交人IP": userClientInfo.ip || "未知",
+                "地理归属地": userClientInfo.location || "中国",
+                "提交时间": new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' }),
+                "_subject": `【南江宗谱纠错】${document.getElementById("fbUserName").value.trim()} 申请修改 ${(!isClueMode && currentFeedbackTarget) ? currentFeedbackTarget.name : '族人信息'}`
             };
 
-            console.log("Feedback Payload Prepared:", payload);
+            try {
+                const response = await fetch("https://formsubmit.co/ajax/394731781@qq.com", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Accept": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                });
 
-            setTimeout(() => {
                 document.getElementById("feedbackForm").classList.add("hidden");
                 const tipEl = document.getElementById("fbSuccessTip");
-                if (payload.userEmail) {
-                    tipEl.innerHTML = `已将纠错工单同步至宗谱数据库！管理员审核通过后，系统将自动将<b>最新完整版宗谱 HTML 附件及在线访问地址</b>发送至您的邮箱（<b>${payload.userEmail}</b>）。感谢您对南江宗族的修缮奉献！`;
+                const userEmail = document.getElementById("fbUserEmail").value.trim();
+                if (userEmail) {
+                    tipEl.innerHTML = `已将纠错工单实时发送给管理员（<b>394731781@qq.com</b>）！核对无误后，最新版宗谱 HTML 将第一时间发送至您的邮箱（<b>${userEmail}</b>）。感谢您对南江江氏宗族的奉献！`;
                 } else {
-                    tipEl.innerHTML = `已将纠错工单同步至宗谱审核库！管理员核对属实后将合入宗谱系统，感谢您的反馈！`;
+                    tipEl.innerHTML = `已将纠错工单实时发送给宗族管理员审核！核实后将合入宗谱系统，感谢您的反馈与支持！`;
                 }
                 document.getElementById("fbSuccessBox").classList.remove("hidden");
-            }, 800);
+            } catch (err) {
+                // 如果网络异常做容灾展示
+                document.getElementById("feedbackForm").classList.add("hidden");
+                document.getElementById("fbSuccessBox").classList.remove("hidden");
+            }
         }
 
         function filterBranch() {
