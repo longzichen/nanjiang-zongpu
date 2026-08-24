@@ -11,9 +11,9 @@ sys.stdout.reconfigure(encoding='utf-8')
 
 SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.qq.com")
 SMTP_PORT = int(os.environ.get("SMTP_PORT", "465"))
-SMTP_USER = os.environ.get("SMTP_USER", "394731781@qq.com")
-SMTP_PASS = os.environ.get("SMTP_PASS", "bavysuwmlkpqbjci")
-ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "394731781@qq.com")
+SMTP_USER = os.environ.get("SMTP_USER", "")
+SMTP_PASS = os.environ.get("SMTP_PASS", "")
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "")
 
 def send_admin_alert(issue_info):
     """当有新纠错提交时，向管理员发送通知邮件"""

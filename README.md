@@ -18,12 +18,12 @@
 ## 🛠️ 管理员配置指南 (GitHub Secrets)
 在 GitHub 仓库中点击 **Settings -> Secrets and variables -> Actions**，添加以下 4 个机密变量：
 
-| Secret 名称 | 填入的值 | 说明 |
+| Secret 名称 | 填入内容示例 | 说明 |
 | :--- | :--- | :--- |
-| `ADMIN_EMAIL` | `394731781@qq.com` | 管理员接收工单通知的邮箱 |
+| `ADMIN_EMAIL` | `your_email@example.com` | 管理员接收工单通知的邮箱 |
 | `SMTP_HOST` | `smtp.qq.com` | QQ 邮箱 SMTP 服务器 |
-| `SMTP_USER` | `394731781@qq.com` | 发信邮箱账号 |
-| `SMTP_PASS` | `bavysuwmlkpqbjci` | QQ 邮箱 SMTP 授权码 |
+| `SMTP_USER` | `your_qq@qq.com` | 发信邮箱账号 |
+| `SMTP_PASS` | `****************` | QQ 邮箱 SMTP 独立授权码（在邮箱设置中生成） |
 
 ---
 
