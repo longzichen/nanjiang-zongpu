@@ -1,0 +1,97 @@
+name: 宗谱纠错审核与邮件全自动闭环
+
+on:
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
+
+jobs:
+  # 1. 收到新 Issue 时：自动给管理员发邮件提醒
+  notify_admin:
+    if: github.event_name == 'issues' && github.event.action == 'opened'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Python 环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 运行 Python 发送管理员提醒邮件
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: 465
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+        run: |
+          python -c "
+          import sys, os
+          sys.path.append('scripts')
+          from genealogy_mailer import send_admin_alert
+          
+          issue_body = '''${{ github.event.issue.body }}'''
+          issue_title = '${{ github.event.issue.title }}'
+          issue_url = '${{ github.event.issue.html_url }}'
+          
+          from apply_correction import parse_issue_body
+          parsed = parse_issue_body(issue_body)
+          parsed['title'] = issue_title
+          parsed['issueUrl'] = issue_url
+          
+          send_admin_alert(parsed)
+          "
+
+  # 2. 管理员在评论区回复 /approve 时：自动合入数据、重新编译发布、发邮件给用户
+  auto_merge_and_reply:
+    if: github.event_name == 'issue_comment' && contains(github.event.comment.body, '/approve')
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 配置 Python 环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: 安装 Python 依赖
+        run: pip install python-docx
+
+      - name: 自动合入数据并重新编译
+        env:
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: 465
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+        run: |
+          python scripts/apply_correction.py "${{ github.event.issue.body }}"
+
+      - name: 提交并推送到仓库主分支 (自动触发 Pages 更新)
+        run: |
+          git config --global user.name "Genealogy-Bot"
+          git config --global user.email "bot@nanjiang.org"
+          git add -A
+          git commit -m "auto: 自动合入宗谱修改工单 #${{ github.event.issue.number }}" || echo "No changes"
+          git push
+
+      - name: 自动关闭 Issue 并回复状态
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '🎉 **审核已通过**！宗谱数据已由 AI 自动合入并重新编译发布，最新版本已通过邮件发送给提交者。'
+            });
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed'
+            });
