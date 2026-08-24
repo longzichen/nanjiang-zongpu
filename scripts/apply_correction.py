@@ -31,75 +31,140 @@ def parse_issue_body(body_text):
     
     return data
 
-def apply_patch_to_build_script(parsed):
+def apply_correction_to_json(parsed):
     """
-    智能语义自动合入引擎：
-    根据工单自动将配偶、子嗣、生卒年修改写入 build_html.py 的动态补丁逻辑中
+    直接修改 genealogy_data.json 数据库
     """
-    target_name = parsed.get('targetName', '')
-    # 提取纯名字（如 "文 (31世 · 二房)" -> "文"）
-    clean_target = re.split(r'[\s(（]', target_name)[0].replace('江', '')
+    json_path = "genealogy_data.json"
+    if not os.path.exists(json_path):
+        json_path = r"C:\Users\longzichen\.gemini\antigravity\scratch\nanjiang-zongpu\genealogy_data.json"
+
+    with open(json_path, 'r', encoding='utf-8') as f:
+        db = json.load(f)
+
+    nodes = db.get('all_nodes', [])
+    target_str = parsed.get('targetName', '')
+    clean_target = re.split(r'[\s(（]', target_str)[0].replace('江', '')
     clue_father = parsed.get('clueFather', '').replace('江', '')
     content = parsed.get('changeContent', '').strip()
     change_type = parsed.get('changeType', '')
 
-    print(f"Applying semantic patch: target='{clean_target}', father='{clue_father}', content='{content}'")
+    print(f"Executing Cloud Auto-Merge: target='{clean_target}', father='{clue_father}', content='{content}'")
 
-    build_py_path = "build_html.py"
-    if not os.path.exists(build_py_path):
-        build_py_path = r"C:\Users\longzichen\.gemini\antigravity\scratch\nanjiang-zongpu\build_html.py"
-    if not os.path.exists(build_py_path):
-        build_py_path = r"C:\Users\longzichen\.gemini\antigravity\scratch\build_html.py"
+    matched_node = None
+    # 优先匹配名字和父辈
+    for n in nodes:
+        if n.get('name') == clean_target:
+            if not clue_father or n.get('father_hint') == clue_father:
+                matched_node = n
+                break
+    if not matched_node:
+        for n in nodes:
+            if n.get('name') == clean_target:
+                matched_node = n
+                break
 
-    with open(build_py_path, 'r', encoding='utf-8') as f:
-        code = f.read()
+    if matched_node:
+        print(f"Matched Node in DB: id={matched_node.get('id')}, name={matched_node.get('name')}, gen={matched_node.get('gen')}")
+        
+        # 1. 增补或修正配偶
+        m_husband = re.search(r'(?:夫|适|配)[：:\s]*([^\s，,。]+)', content)
+        m_wife = re.search(r'(?:妻|配|娶)[：:\s]*([^\s，,。]+)', content)
 
-    # 构造补丁代码片段
-    patch_code = ""
-    
-    # 1. 增补配偶 (如 "夫 曾德亮" 或 "妻 李四")
-    m_husband = re.search(r'(?:夫|配|适|女婿)[：:\s]*([^\s，,。]+)', content)
-    m_wife = re.search(r'(?:妻|配|娶)[：:\s]*([^\s，,。]+)', content)
-
-    if '配偶' in change_type or m_husband or m_wife or '夫' in content or '妻' in content:
-        if m_husband or '夫' in content:
+        if m_husband or ('配偶' in change_type and matched_node.get('gender') == 'female') or '夫' in content:
             h_name = m_husband.group(1) if m_husband else content.replace('夫', '').strip()
-            patch_code = f"""
-        if clean_name == '{clean_target}' and '{h_name}' not in detail:
-            detail += '。适{h_name}。'
-"""
-        elif m_wife or '妻' in content:
+            matched_node['wife'] = h_name
+            if '适' not in matched_node.get('detail', ''):
+                matched_node['detail'] = matched_node.get('detail', '') + f"。适{h_name}。"
+            print(f"Updated spouse (husband): {h_name}")
+
+        elif m_wife or ('配偶' in change_type and matched_node.get('gender') != 'female') or '妻' in content:
             w_name = m_wife.group(1) if m_wife else content.replace('妻', '').strip()
-            patch_code = f"""
-        if clean_name == '{clean_target}' and '{w_name}' not in detail:
-            detail += '。妻{w_name}。'
-"""
+            matched_node['wife'] = w_name
+            if '妻' not in matched_node.get('detail', ''):
+                matched_node['detail'] = matched_node.get('detail', '') + f"。妻{w_name}。"
+            print(f"Updated spouse (wife): {w_name}")
 
-    # 2. 增补子嗣 (如 "增加儿子 江宗泽，2023年生")
-    elif '子' in content or '女' in content or '增补' in change_type:
-        patch_code = f"""
-        if clean_name == '{clean_target}' and '{content[:4]}' not in detail:
-            detail += '。{content}。'
-"""
-    # 3. 常规生平或生卒年修正
-    else:
-        patch_code = f"""
-        if clean_name == '{clean_target}':
-            detail += '。{content}。'
-"""
+        # 2. 增补子嗣
+        elif '子' in content or '女' in content or '增加' in content:
+            # 提取名字
+            m_child = re.search(r'(?:儿子|女儿|子|女)[：:\s]*([^\s，,。]+)', content)
+            c_name = m_child.group(1).replace('江', '') if m_child else content
+            is_daughter = '女' in content
+            c_gen = matched_node.get('gen', 30) + 1
+            new_id = f"node_{len(nodes) + 1}"
+            
+            # 生年提取
+            m_yr = re.search(r'(\d{4})年?', content)
+            c_birth = int(m_yr.group(1)) if m_yr else None
 
-    # 将补丁注入到 build_html.py 的 clean_name 判定逻辑后
-    anchor = "clean_wife, full_wife = extract_wife(detail)"
-    if anchor in code and patch_code:
-        if patch_code.strip() not in code:
-            code = code.replace(anchor, patch_code + "\n        " + anchor)
-            with open(build_py_path, 'w', encoding='utf-8') as f:
-                f.write(code)
-            print("Successfully injected patch into build_html.py")
+            new_node = {
+                'id': new_id,
+                'name': c_name,
+                'full_name': '江' + c_name,
+                'gen': c_gen,
+                'father_id': matched_node.get('id'),
+                'father_hint': matched_node.get('name'),
+                'gender': 'female' if is_daughter else 'male',
+                'branch': matched_node.get('branch', '二房'),
+                'detail': f"父: {matched_node.get('name')} ({matched_node.get('gen')}世)。" + content,
+                'wife': '',
+                'birth_year': c_birth,
+                'children': []
+            }
+            nodes.append(new_node)
+            if 'children' not in matched_node:
+                matched_node['children'] = []
+            matched_node['children'].append(new_id)
+            print(f"Successfully added child node: {c_name} (gen {c_gen}) under {matched_node.get('name')}")
 
-    # 触发重新编译
-    os.system(f"{sys.executable} {build_py_path}")
-    print("Rebuilt HTML successfully.")
+        # 3. 补充生平
+        else:
+            matched_node['detail'] = matched_node.get('detail', '') + f"。{content}。"
+            print("Appended detail to matched node.")
+
+    with open(json_path, 'w', encoding='utf-8') as f:
+        json.dump(db, f, ensure_ascii=False, indent=2)
+
+    print("Saved updated genealogy_data.json successfully.")
+
+def rebuild_html_from_json():
+    """根据最新的 JSON 数据重构 index.html"""
+    json_path = "genealogy_data.json"
+    if not os.path.exists(json_path):
+        json_path = r"C:\Users\longzichen\.gemini\antigravity\scratch\nanjiang-zongpu\genealogy_data.json"
+
+    with open(json_path, 'r', encoding='utf-8') as f:
+        db = json.load(f)
+
+    nodes = db.get('all_nodes', [])
+    nodes_json_str = json.dumps(nodes, ensure_ascii=False)
+
+    html_path = "index.html"
+    if not os.path.exists(html_path):
+        html_path = r"C:\Users\longzichen\.gemini\antigravity\scratch\nanjiang-zongpu\index.html"
+
+    with open(html_path, 'r', encoding='utf-8') as f:
+        html_content = f.read()
+
+    # 替换其中的 rawNodes 数据
+    pattern = r'const rawNodes = \[.*?\];'
+    replacement = f'const rawNodes = {nodes_json_str};'
+    
+    new_html = re.sub(pattern, replacement, html_content, flags=re.DOTALL)
+    
+    with open(html_path, 'w', encoding='utf-8') as f:
+        f.write(new_html)
+
+    # 同步更新本地发布文件
+    target_local = r"E:\闲杂\族谱\南江江氏宗谱世系关系网.html"
+    try:
+        with open(target_local, 'w', encoding='utf-8') as f:
+            f.write(new_html)
+    except Exception:
+        pass
+
+    print(f"Rebuilt index.html with {len(nodes)} nodes successfully.")
 
 def main():
     if len(sys.argv) < 2:
@@ -110,17 +175,8 @@ def main():
     parsed = parse_issue_body(issue_body)
     print("Parsed Issue Data:", parsed)
 
-    apply_patch_to_build_script(parsed)
-
-    # 同步到 index.html
-    candidate_html = r"E:\闲杂\族谱\南江宗谱关系网（最新完美版）.html"
-    if not os.path.exists(candidate_html):
-        candidate_html = "index.html"
-    if os.path.exists(candidate_html):
-        with open(candidate_html, 'r', encoding='utf-8') as f:
-            content = f.read()
-        with open("index.html", 'w', encoding='utf-8') as f:
-            f.write(content)
+    apply_correction_to_json(parsed)
+    rebuild_html_from_json()
 
     # 发送回执邮件给用户
     user_email = parsed.get('userEmail')
