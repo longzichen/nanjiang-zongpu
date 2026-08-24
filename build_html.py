@@ -230,8 +230,8 @@ for t in consolidated_lines:
         gender = 'female' if is_female_line else 'male'
 
         if clean_name == '祥龙' and gen == 31:
-            if '江宗泽' not in detail and '宗泽' not in detail:
-                detail += '。子一：宗泽，生于2023年。'
+            if '江京泽' not in detail and '京泽' not in detail:
+                detail += '。子一：京泽，生于2023年。'
 
         clean_wife, full_wife = extract_wife(detail)
         daughters, daughters_info = extract_daughters_rich(detail)
