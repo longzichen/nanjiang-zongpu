@@ -229,6 +229,10 @@ for t in consolidated_lines:
         is_female_line = bool(re.search(r'(?:之女|公之女|公长女|公次女|公三女|公四女|生女|育女|大女|长女|次女|三女|四女|女一|女二|女三|女四|二女|三女|四女)', detail.split('。')[0]))
         gender = 'female' if is_female_line else 'male'
 
+        if clean_name == '筱钰' and gen == 30:
+            if '曾德亮' not in detail:
+                detail = detail.replace('女一：文，', '女一：文，适曾德亮，')
+
         if clean_name == '祥龙' and gen == 31:
             if '江京泽' not in detail and '京泽' not in detail:
                 detail += '。子一：京泽，生于2023年。'
