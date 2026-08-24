@@ -7,8 +7,8 @@ on:
     types: [created]
 
 jobs:
-  # 1. 收到新 Issue 时：自动给管理员发邮件提醒
-  notify_admin:
+  # 1. 收到新 Issue 时：AI 自动初审并在评论区生成报告 + 发送邮件提醒管理员
+  ai_precheck_and_notify_admin:
     if: github.event_name == 'issues' && github.event.action == 'opened'
     runs-on: ubuntu-latest
     steps:
@@ -20,7 +20,34 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: 运行 Python 发送管理员提醒邮件
+      - name: 运行 AI 初审并生成分析报告
+        id: run_ai
+        run: |
+          python -c "
+          import sys, os
+          sys.path.append('scripts')
+          from ai_reviewer import generate_ai_precheck_report
+          
+          issue_body = '''${{ github.event.issue.body }}'''
+          report = generate_ai_precheck_report(issue_body)
+          with open('ai_report.txt', 'w', encoding='utf-8') as f:
+              f.write(report)
+          "
+
+      - name: AI 在 GitHub Issue 评论区发表初审报告
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('ai_report.txt', 'utf8');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: report
+            });
+
+      - name: 发送提醒邮件给管理员 (含 AI 初审建议)
         env:
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: 465
