@@ -6,6 +6,10 @@ on:
   issue_comment:
     types: [created]
 
+permissions:
+  contents: write
+  issues: write
+
 jobs:
   # 1. 收到新 Issue 时：AI 自动初审并在评论区生成报告 + 发送邮件提醒管理员
   ai_precheck_and_notify_admin:
