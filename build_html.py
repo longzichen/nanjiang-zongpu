@@ -233,6 +233,10 @@ for t in consolidated_lines:
             if '江京泽' not in detail and '京泽' not in detail:
                 detail += '。子一：京泽，生于2023年。'
 
+        if clean_name == '祥彪' and gen == 31:
+            if '京瑶' not in detail and '京瞳' not in detail:
+                detail += '。女二：京瑶、京瞳。'
+
         clean_wife, full_wife = extract_wife(detail)
         daughters, daughters_info = extract_daughters_rich(detail)
         exp_count, inline_children = extract_inline_children(detail)
