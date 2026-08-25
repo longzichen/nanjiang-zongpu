@@ -102,7 +102,7 @@ def extract_general_birth_year(text):
 def clean_child_name(cname):
     cname = re.sub(r'^[一二三四五六七八九十\d]+[：:]', '', cname)
     cname = re.sub(r'^(?:长子|次子|三子|四子|五子|嗣长子|嗣次子|嗣子|继子|子|男|长女|次女|三女|四女|大女|生|育)', '', cname)
-    cname = re.split(r'[，,（\(：:\s]|之子|之女|公之子|生于|卒于|居|毕业|工作|曾任|历任|退休|嫁|适|夫|妻|配|原配|次配|继配', cname)[0]
+    cname = re.split(r'[，,（\(：:\s]|之子|之女|公之子|生于|卒于|居|毕业|工作|曾任|历任|退休|嫁|适|夫|妻|配|原配|次配|继配|无嗣|出嗣|止', cname)[0]
     cname = re.sub(r'[\(（\)\）]', '', cname)
     cname = re.sub(r'[，,；;。！!、\?？].*', '', cname)
     cname = cname.replace('公', '').strip()
@@ -115,7 +115,8 @@ def extract_wife(detail):
     full_parts = []
     bad_wife_words = ('子', '女', '长子', '次子', '三子', '四子', '长女', '次女', '三女', '四女', '孙', '孙女', '孙子', '电大', '次', '原', '两', '俩', '居', '在', '工作', '经商', '开公司')
     for m in matches:
-        cn = re.split(r'[，,；;（\(（\s]|生于|卒于|逝世于|居|嫁|卒|工作|毕业|现在', m.strip())[0].strip()
+        cn = re.split(r'[，,；;（\(（\s]|生于|卒于|逝世于|居|嫁|卒|工作|毕业|现在|奥杳人|人|村', m.strip())[0].strip()
+        cn = re.sub(r'氏佩琴', '佩琴', cn)
         if cn and 1 <= len(cn) <= 10 and not any(bw in cn for bw in bad_wife_words) and cn not in clean_names:
             clean_names.append(cn)
             full_parts.append(m.strip())
