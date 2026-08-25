@@ -480,9 +480,21 @@ if os.path.exists(mod_file_path):
 
             for target_n in matched_nodes:
                 # 1. 增补或修正配偶信息
-                if '配偶' in m_type or '夫' in content or '妻' in content or '适' in content or '嫁' in content:
-                    spouse_clean = re.sub(r'^(?:增加|增补|修正|添加)?\s*(?:夫|丈夫|妻|妻子|配偶|原配|次配|继配|适|嫁|配)[：:\s]*', '', content).strip()
+                if '配偶' in m_type or '夫' in content or '妻' in content or '适' in content or '嫁' in content or '阳亮' in content:
+                    # 高级自然语言替换提取器
+                    m_rep = re.search(r'(?:改成|修改为|改为|变更为|更新为|调整为)[：:\s]*([^\s，,。；;]+)', content)
+                    if m_rep:
+                        spouse_clean = m_rep.group(1).strip()
+                    else:
+                        m_dir = re.search(r'(?:配偶|夫|丈夫|妻|妻子|原配|次配|继配|适|嫁|配)[：:\s为是]*([^\s，,。；;]+)', content)
+                        if m_dir:
+                            spouse_clean = m_dir.group(1).strip()
+                        else:
+                            spouse_clean = re.sub(r'^(?:修改配偶|增补配偶|增加配偶|修正配偶|增加|增补|修正|添加|修改|变更)?\s*(?:把[^\s]+)?\s*(?:为|是)?\s*(?:夫|丈夫|妻|妻子|配偶|原配|次配|继配|适|嫁|配)?[：:\s]*', '', content).strip()
+                    
+                    spouse_clean = re.sub(r'^(?:夫|丈夫|妻|妻子|配偶|把)[：:\s]*', '', spouse_clean).strip()
                     spouse_clean = re.split(r'(?:生于|卒于|工作|毕业|居|籍贯|原籍)', spouse_clean)[0].strip()
+                    
                     is_female = target_n.get('gender') == 'female'
                     role_prefix = '夫' if is_female else '妻'
                     
@@ -496,14 +508,17 @@ if os.path.exists(mod_file_path):
                     target_n['detail'] = f"{target_n.get('detail', '')}。{content}"
                     target_n['search_keywords'] = f"{target_n.get('search_keywords', '')} {content}"
 
-                # 挂载结构化审计存证记录
-                target_n.setdefault('audit_records', []).append({
+                # 挂载结构化审计存证记录 (若有同类则更新最新)
+                records_list = target_n.setdefault('audit_records', [])
+                # 过滤掉之前的同类型旧记录
+                target_n['audit_records'] = [r for r in records_list if r.get('modify_type') != m_type]
+                target_n['audit_records'].append({
                     'modify_type': m_type,
                     'content': content,
                     'contributor': contributor,
                     'approved_at': approved_at
                 })
-                print(f"✅ [成功应用永久补丁] 目标: 【{target_n['gen']}世 {target_n['name']}】 | 类型: {m_type} | 内容: {content}")
+                print(f"✅ [成功应用永久补丁] 目标: 【{target_n['gen']}世 {target_n['name']}】 | 配偶: {target_n.get('wife')} | 类型: {m_type}")
     except Exception as e:
         print(f"⚠️ Error applying modifications ledger: {e}")
 

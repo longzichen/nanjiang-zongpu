@@ -18,14 +18,15 @@
     }
   },
   {
-    "id": "mod_20260825111039_2",
+    "id": "mod_20260825_002",
     "target_person": "秀华",
     "target_gen": 30,
     "target_father": "庆春",
+    "target_branch": "二房",
     "modify_type": "增补或修正配偶信息",
-    "content": "增加 夫 江阳亮",
+    "content": "修改配偶 把江阳亮改成阳亮",
     "contributor": "江维川",
-    "contact": "回发邮箱：394731781@qq.com",
+    "contact": "longzichen90",
     "email": "394731781@qq.com",
     "approved_at": "2026-08-25",
     "status": "APPROVED"
