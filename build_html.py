@@ -116,57 +116,48 @@ def extract_wife(detail):
 def extract_daughters_rich(detail):
     daughters = []
     daughters_info = []
-    
-    clean_detail = re.split(r'孙女|孙子|孙[一二三四五六七八九十\d]*[：:]', detail)[0]
-    
-    matches = re.finditer(r'(?<![之公长次三四五])(?:生女|育女|有女|女儿|女[一二三四五六七八九十\d]*)[：:\s]+(.*?)(?=(?:(?<![之公长次三四五])(?:子[一二三四五六七八九十\d]*|男[一二三四五六七八九十\d]*)[：:\s]+|$))', clean_detail, re.DOTALL)
-    for m in matches:
-        seg = m.group(1)
-        seg_protected = re.sub(r'[\(（](.*?)[\)）]', lambda match: '（' + match.group(1).replace('，', '##').replace(',', '##').replace('、', '##').replace('；', '##').replace(';', '##').replace('。', '##').replace(' ', '##') + '）', seg)
-        
-        tokens = re.split(r'[，,；;。、\s\n]', seg_protected)
-        curr_name = ''
-        curr_desc = []
-        for tok in tokens:
-            tok_clean = tok.replace('##', '，').strip()
-            if not tok_clean: continue
-            if any(tok_clean.startswith(p) for p in ['次配：', '原配：', '继配：', '妻：', '妣：', '又名']): continue
-            
-            is_resume = any(k in tok_clean for k in resume_filter_words)
-            t_name = re.sub(r'^(?:生女|育女|有女|长女|次女|三女|四女|大女|女)[一二三四五六七八九十\d]*[：:\s]*', '', tok_clean)
-            t_name = re.sub(r'^(?:长女|次女|三女|四女|大女)', '', t_name)
-            t_name = re.sub(r'^又名', '', t_name)
-            t_name = re.sub(r'[\(（\)\）]', '', t_name).strip()
-            possible_name = re.split(r'生于|嫁|夫|适|居|卒|毕业|配|工作|曾任|历任|原配|次配|继配', t_name)[0].strip()
-            possible_name = re.sub(r'^江', '', possible_name)
-            
-            split_names = [possible_name]
-            if len(possible_name) == 4 and possible_name[:2] != possible_name[2:]:
-                if possible_name[0] == possible_name[2] or possible_name.startswith('金') or possible_name.startswith('玉'):
-                    split_names = [possible_name[:2], possible_name[2:]]
 
-            for p_name in split_names:
-                if not is_resume and p_name and re.match(r'^[\u4e00-\u9fa5]{1,5}$', p_name) and p_name not in invalid_child_words and not any(k in p_name for k in ['市', '省', '县', '街道', '村', '公务员', '大学', '学院', '次', '长', '原', '男', '子', '双胞']):
-                    if curr_name:
-                        if curr_name not in daughters:
-                            daughters.append(curr_name)
-                            desc_str = '，'.join(curr_desc)
-                            by = extract_general_birth_year(desc_str)
-                            daughters_info.append({'name': curr_name, 'full_name': f'江{curr_name}', 'info': desc_str, 'birth_year': by})
-                    curr_name = p_name
-                    curr_desc = [tok_clean]
-                else:
-                    if curr_name: curr_desc.append(tok_clean)
-        if curr_name:
-            if curr_name not in daughters:
-                daughters.append(curr_name)
-                desc_str = '，'.join(curr_desc)
-                by = extract_general_birth_year(desc_str)
-                daughters_info.append({'name': curr_name, 'full_name': f'江{curr_name}', 'info': desc_str, 'birth_year': by})
-                
-    if '小' in daughters and '妹' in daughters:
-        daughters = [d for d in daughters if d not in ('小', '妹')]
-        daughters.append('小妹')
+    # 保护括号内容 (如 经瑞（居美国，博士）)
+    prot_text = re.sub(r'[（\(](.*?)[）\)]', lambda m: '（' + m.group(1).replace('、', '##').replace('，', '##').replace(',', '##').replace('；', '##').replace(';', '##') + '）', detail)
+    
+    # 查找所有女相关的片段 (支持 "女四：经瑞..."、"子四女一：...女经瑄"、"三女经织、经纶、经芳"、"女一：丽龙")
+    matches = re.finditer(r'(?:^|[。，,、；;\s])(?:(?:生女|育女|大女|长女|次女|三女|四女|女)[一二三四五六七八九十\d]*|[一二三四五六七八九十\d]+女)[：:\s]*([^;\n]+)', prot_text)
+    for m in matches:
+        raw_seg = m.group(1).strip()
+        # 清除子嗣关键词
+        raw_seg = re.split(r'(?:(?<![之公长次三四五])子[一二三四五六七八九十\d]*|生一子|生子|续取|三取)', raw_seg)[0]
+        # 按顿号、逗号、句号、空格分词
+        items = re.split(r'[、，,\s/；;。]+', raw_seg)
+        for it in items:
+            it_raw = it.replace('##', '、').strip()
+            if not it_raw: continue
+            
+            # 去除括号后的纯名字判断
+            d_name = re.sub(r'[（\(].*?[）\)]', '', it_raw).strip()
+            # 去除前缀修饰
+            d_name = re.sub(r'^(?:长女|次女|三女|四女|大女|小女|幼女|女)[一二三四五六七八九十\d]*[：:\s]*', '', d_name).strip()
+            # 剥离后续描述 (生于/嫁/适/夫/毕业/工作)
+            d_name = re.split(r'(?:生于|出生于|卒于|嫁|适|夫|配|工作|毕业|居|往|博士|硕士|大学|大专|高中|初中)', d_name)[0].strip()
+            d_name = d_name.replace('江', '').strip()
+            
+            # 拆分金娇金琳等双字女儿名
+            split_names = [d_name]
+            if len(d_name) == 4 and d_name[:2] != d_name[2:]:
+                if d_name[0] == d_name[2] or d_name.startswith('金') or d_name.startswith('玉'):
+                    split_names = [d_name[:2], d_name[2:]]
+
+            for pn in split_names:
+                if pn and 1 <= len(pn) <= 4 and pn not in invalid_child_words and pn not in ('无', '早逝', '早夭', '出嗣', '止', '待考', '女', '男', '长', '次', '三', '四', '五', '生', '卒', '居'):
+                    if not any(d['name'] == pn for d in daughters_info):
+                        by = extract_general_birth_year(it_raw)
+                        daughters.append(pn)
+                        daughters_info.append({
+                            'name': pn,
+                            'full_name': f'江{pn}',
+                            'info': it_raw,
+                            'birth_year': by
+                        })
+
     return daughters, daughters_info
 
 def extract_inline_children(detail):
@@ -211,10 +202,11 @@ def extract_inline_children(detail):
             clean_n = re.split(r'(?:生于|卒于|妻|配|适|嫁|工作于|毕业于|曾任)', clean_n)[0].strip()
             clean_n = clean_child_name(clean_n)
             if clean_n and 1 <= len(clean_n) <= 4 and not re.search(r'[\d\?？]', clean_n):
-                if clean_n not in invalid_child_words and clean_n not in ('无', '早逝', '早夭', '出嗣', '止', '生于', '卒于', '待考', '子', '女'):
-                    # 避免外层添加内嵌的孙辈
-                    if not any(c['name'] == clean_n for c in children):
-                        children.append({'name': clean_n, 'wife': '', 'raw': clean_n, 'birth_year': None, 'sub_children': sub_children})
+                if not re.match(r'^(?:女|女[一二三四五六七八九十\d]+)$', clean_n):
+                    if clean_n not in invalid_child_words and clean_n not in ('无', '早逝', '早夭', '出嗣', '止', '生于', '卒于', '待考', '子', '女'):
+                        # 避免外层添加内嵌的孙辈
+                        if not any(c['name'] == clean_n for c in children):
+                            children.append({'name': clean_n, 'wife': '', 'raw': clean_n, 'birth_year': None, 'sub_children': sub_children})
                         
     return len(children), children
 
