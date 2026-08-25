@@ -508,16 +508,15 @@ if os.path.exists(mod_file_path):
                     target_n['detail'] = f"{target_n.get('detail', '')}。{content}"
                     target_n['search_keywords'] = f"{target_n.get('search_keywords', '')} {content}"
 
-                # 挂载结构化审计存证记录 (若有同类则更新最新)
+                # 挂载结构化终身审计存证记录（保留历次修改完整档案）
                 records_list = target_n.setdefault('audit_records', [])
-                # 过滤掉之前的同类型旧记录
-                target_n['audit_records'] = [r for r in records_list if r.get('modify_type') != m_type]
-                target_n['audit_records'].append({
+                records_list.append({
                     'modify_type': m_type,
                     'content': content,
                     'contributor': contributor,
                     'approved_at': approved_at
                 })
+                print(f"✅ [成功应用永久补丁] 目标: 【{target_n['gen']}世 {target_n['name']}】 | 配偶: {target_n.get('wife')} | 类型: {m_type} | 历史记录数: {len(records_list)}")
                 print(f"✅ [成功应用永久补丁] 目标: 【{target_n['gen']}世 {target_n['name']}】 | 配偶: {target_n.get('wife')} | 类型: {m_type}")
     except Exception as e:
         print(f"⚠️ Error applying modifications ledger: {e}")
@@ -1546,11 +1545,13 @@ html_template = r"""<!DOCTYPE html>
             
             document.getElementById("ttDetail").innerText = dData.word_raw_line || dData.detail || "暂无原始记载。";
             
-            // 渲染后裔核实增补/修改记载
+            // 渲染后裔核实增补/修改记载 (多履历历史精确到分)
             const auditBox = document.getElementById("ttAuditBox");
             const auditContent = document.getElementById("ttAuditContent");
             if (dData.audit_records && dData.audit_records.length > 0) {
-                const auditText = dData.audit_records.map(a => `• 【${a.modify_type}】${a.content} (提交人: ${a.contributor} · ${a.approved_at})`).join('\n');
+                const auditText = dData.audit_records.map((a, idx) => 
+                    `[第${idx+1}次修改 · ${a.approved_at}]\n• 提交人: ${a.contributor}\n• 类型: ${a.modify_type}\n• 内容: ${a.content}`
+                ).join('\n\n');
                 auditContent.innerText = auditText;
                 auditBox.classList.remove("hidden");
             } else {
@@ -1770,11 +1771,13 @@ html_template = r"""<!DOCTYPE html>
             document.getElementById("drawerWifeFull").innerText = dData.wife ? `配偶: ${dData.wife}` : "未记录配偶";
             document.getElementById("drawerWordRawText").innerText = dData.word_raw_line || dData.detail || "暂无原始记载。";
 
-            // 抽屉端渲染后裔核实增补/修改记载
+            // 抽屉端渲染后裔核实增补/修改记载 (多履历历史精确到分)
             const drawerAuditBox = document.getElementById("drawerAuditBox");
             const drawerAuditContent = document.getElementById("drawerAuditContent");
             if (dData.audit_records && dData.audit_records.length > 0) {
-                const auditText = dData.audit_records.map(a => `• 【${a.modify_type}】${a.content} (提交人: ${a.contributor} · ${a.approved_at})`).join('\n');
+                const auditText = dData.audit_records.map((a, idx) => 
+                    `[第${idx+1}次修改 · ${a.approved_at}]\n• 提交人: ${a.contributor}\n• 类型: ${a.modify_type}\n• 内容: ${a.content}`
+                ).join('\n\n');
                 drawerAuditContent.innerText = auditText;
                 drawerAuditBox.classList.remove("hidden");
             } else {
