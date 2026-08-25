@@ -171,25 +171,50 @@ def extract_daughters_rich(detail):
 
 def extract_inline_children(detail):
     children = []
-    max_exp = 0
     
-    # 提取所有 "子X：" 或 "男X：" 或 "长子"、"次子" 的片段
-    matches = re.finditer(r'(?:^|[；;。，,、\s（\(\[【])(?:(?:子|男)(?:[一二三四五六七八九十\d]*)|长子|次子|三子|四子|五子)[：:\s]*([^；;。\)）\]】\n]+)', detail)
-    for m in matches:
-        raw_segment = m.group(1).strip()
-        # 清除生平关键词，但保留名字序列
-        raw_segment = re.split(r'(?:(?<![之公长次三四五])女[一二三四五六七八九十\d]*|生女|育女|妻|生于|卒于|适|嫁|工作于|毕业于|曾任|居|往)', raw_segment)[0]
-        # 按顿号、逗号、分号、斜杠、空格拆分
-        names = re.split(r'[、，,\s/；;]+', raw_segment)
-        for nm in names:
-            nm = re.sub(r'[（\(].*?[）\)]', '', nm).strip()
-            # 彻底去除长子、次子、三子、四子、五子、继子、嗣子、嗣长子、嗣次子等前缀
-            nm = re.sub(r'^(?:号|字|名|之子|长子|次子|三子|四子|五子|六子|继子|嗣子|嗣长子|嗣次子|嗣三子|子|男)\s*', '', nm).strip()
-            cname = clean_child_name(nm)
-            if cname and 1 <= len(cname) <= 4 and not re.search(r'[\d\?？]', cname):
-                if not any(w in cname for w in invalid_child_words) and not any(k in cname for k in resume_filter_words) and not any(k in cname for k in ['市', '省', '县', '街道', '村', '次', '长', '原', '女', '双胞', '生', '卒', '居']):
-                    if not any(c['name'] == cname for c in children):
-                        children.append({'name': cname, 'wife': '', 'raw': cname, 'birth_year': None})
+    # 1. 提取所有形如 "子一：广兴；子二：煜兴" 或 "长子昊楠...次子昊杨" 的单项 (排除括号内嵌套)
+    clean_no_paren = re.sub(r'[（\(].*?[）\)]', '', detail)
+    singles = re.findall(r'(?:^|[；;。，,\s])(?:子[一二三四五六七八九十\d]*|长子|次子|三子|四子|五子|六子)[：:\s]*([^\s，,；;。、\)）]+)', clean_no_paren)
+    for s in singles:
+        s_clean = re.sub(r'^(?:号|字|名|长子|次子|三子|四子|五子|继子|嗣子|子|男)', '', s).strip()
+        s_clean = clean_child_name(s_clean)
+        if s_clean and 1 <= len(s_clean) <= 4 and not re.search(r'[\d\?？]', s_clean):
+            if s_clean not in invalid_child_words and s_clean not in ('无', '早逝', '早夭', '出嗣', '止', '生于', '卒于', '待考', '子', '女'):
+                if not any(c['name'] == s_clean for c in children):
+                    children.append({'name': s_clean, 'wife': '', 'raw': s_clean, 'birth_year': None, 'sub_children': []})
+                
+    # 2. 提取形如 "子四：拱京、拱岳（出）、拱藩（居缅甸，子五：如桐、如轩、如威、如胜、如明）、拱衍" 的列表项
+    m_lists = re.finditer(r'(?:^|[；;。，,（\(\s])(?:子|男)[一二三四五六七八九十\d]*[：:\s]+([^。;\n]+)', detail)
+    for ml in m_lists:
+        content = ml.group(1).strip()
+        # 保护括号
+        prot = re.sub(r'[（\(](.*?)[）\)]', lambda m: '（' + m.group(1).replace('、', '##').replace('，', '##').replace(',', '##').replace('；', '##') + '）', content)
+        items = re.split(r'[、，,\s；;]+', prot)
+        for item in items:
+            item_raw = item.replace('##', '、').strip()
+            if not item_raw: continue
+            
+            # 提取内嵌孙辈
+            sub_children = []
+            m_sub = re.search(r'[（\(].*?子[一二三四五六七八九十\d]*[：:\s]*([^）\)]+)[）\)]', item_raw)
+            if m_sub:
+                sub_content = m_sub.group(1)
+                sub_names = re.split(r'[、，,\s/；;]+', sub_content)
+                for sn in sub_names:
+                    sn_clean = re.sub(r'^(?:号|字|名|子|男)', '', sn).strip()
+                    sn_clean = clean_child_name(sn_clean)
+                    if sn_clean and 1 <= len(sn_clean) <= 4 and sn_clean not in invalid_child_words:
+                        sub_children.append(sn_clean)
+
+            clean_n = re.sub(r'[（\(].*?[）\)]', '', item_raw).strip()
+            clean_n = re.sub(r'^(?:号|字|名|之子|长子|次子|三子|四子|五子|六子|继子|嗣子|嗣长子|嗣次子|嗣三子|子|男)\s*', '', clean_n).strip()
+            clean_n = re.split(r'(?:生于|卒于|妻|配|适|嫁|工作于|毕业于|曾任)', clean_n)[0].strip()
+            clean_n = clean_child_name(clean_n)
+            if clean_n and 1 <= len(clean_n) <= 4 and not re.search(r'[\d\?？]', clean_n):
+                if clean_n not in invalid_child_words and clean_n not in ('无', '早逝', '早夭', '出嗣', '止', '生于', '卒于', '待考', '子', '女'):
+                    # 避免外层添加内嵌的孙辈
+                    if not any(c['name'] == clean_n for c in children):
+                        children.append({'name': clean_n, 'wife': '', 'raw': clean_n, 'birth_year': None, 'sub_children': sub_children})
                         
     return len(children), children
 
@@ -309,7 +334,7 @@ for r in records:
                     existing_child['wife_full'] = f"配偶: {ic['wife']}"
                 continue
             
-            if (cgen, cname) in existing_names_by_gen: continue
+            if any(x.get('parentId') == r['id'] and x['clean_name'] == cname for x in (records + additional_nodes)): continue
             if cname in invalid_child_words or len(cname) > 5: continue
 
             existing_names_by_gen.add((cgen, cname))
@@ -334,6 +359,31 @@ for r in records:
                 'parentId': r['id']
             }
             additional_nodes.append(add_node)
+            
+            # 如果有嵌套孙辈 (如 拱藩 名下的 如桐、如轩、如威、如胜、如明)
+            if ic.get('sub_children'):
+                for scname in ic['sub_children']:
+                    scgen = cgen + 1
+                    sub_add_node = {
+                        'id': f'node_{len(records) + len(additional_nodes) + 1}',
+                        'gen': scgen,
+                        'name': scname,
+                        'clean_name': scname,
+                        'full_search_name': f"江{scname}",
+                        'gender': 'male',
+                        'birth_year': None,
+                        'search_keywords': f"{scname} 江{scname} {cname}之子",
+                        'branch': r['branch'],
+                        'father_hint': cname,
+                        'wife': '',
+                        'wife_full': '',
+                        'daughters': [],
+                        'daughters_info': [],
+                        'detail': f"{cname}之子。{scname}",
+                        'word_raw_line': f"【嵌套海外宗亲成员】父: {cname} ({cgen}世)。记载: {scname}",
+                        'parentId': add_node['id']
+                    }
+                    additional_nodes.append(sub_add_node)
 
 daughter_nodes = []
 for r in (records + additional_nodes):
