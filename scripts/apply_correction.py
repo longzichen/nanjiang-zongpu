@@ -108,13 +108,20 @@ def apply_to_ledger_and_rebuild(parsed):
     return new_entry
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python apply_correction.py <issue_body_file>")
-        sys.exit(1)
+    body = ""
+    if len(sys.argv) >= 2:
+        arg = sys.argv[1]
+        if os.path.exists(arg):
+            with open(arg, 'r', encoding='utf-8') as f:
+                body = f.read()
+        else:
+            body = arg
+    else:
+        body = os.environ.get('ISSUE_BODY', '')
 
-    issue_file = sys.argv[1]
-    with open(issue_file, 'r', encoding='utf-8') as f:
-        body = f.read()
+    if not body:
+        print("Warning: No issue body provided via arguments or ISSUE_BODY environment variable.")
+        sys.exit(0)
 
     parsed = parse_issue_body(body)
     print("Parsed Issue Fields:", parsed)

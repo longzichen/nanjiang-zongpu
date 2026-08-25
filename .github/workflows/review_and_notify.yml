@@ -26,13 +26,15 @@ jobs:
 
       - name: 运行 AI 初审并生成分析报告
         id: run_ai
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
         run: |
           python -c "
           import sys, os
           sys.path.append('scripts')
           from ai_reviewer import generate_ai_precheck_report
           
-          issue_body = '''${{ github.event.issue.body }}'''
+          issue_body = os.environ.get('ISSUE_BODY', '')
           report = generate_ai_precheck_report(issue_body)
           with open('ai_report.txt', 'w', encoding='utf-8') as f:
               f.write(report)
@@ -58,20 +60,20 @@ jobs:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_URL: ${{ github.event.issue.html_url }}
         run: |
           python -c "
           import sys, os
           sys.path.append('scripts')
           from genealogy_mailer import send_admin_alert
-          
-          issue_body = '''${{ github.event.issue.body }}'''
-          issue_title = '${{ github.event.issue.title }}'
-          issue_url = '${{ github.event.issue.html_url }}'
-          
           from apply_correction import parse_issue_body
+          
+          issue_body = os.environ.get('ISSUE_BODY', '')
           parsed = parse_issue_body(issue_body)
-          parsed['title'] = issue_title
-          parsed['issueUrl'] = issue_url
+          parsed['title'] = os.environ.get('ISSUE_TITLE', '新纠错申请')
+          parsed['issueUrl'] = os.environ.get('ISSUE_URL', '')
           
           send_admin_alert(parsed)
           "
@@ -99,8 +101,9 @@ jobs:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
         run: |
-          python scripts/apply_correction.py "${{ github.event.issue.body }}"
+          python scripts/apply_correction.py
 
       - name: 提交并推送到仓库主分支 (自动触发 Pages 更新)
         run: |
