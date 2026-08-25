@@ -173,33 +173,25 @@ def extract_inline_children(detail):
     children = []
     max_exp = 0
     
-    clean_detail = re.split(r'孙女|孙子|孙[一二三四五六七八九十\d]*[：:]', detail)[0]
-    
-    matches = re.finditer(r'(?<![之公长次三四五])(?:子[一二三四五六七八九十\d]*|男[一二三四五六七八九十\d]*)[：:\s]+(.*?)(?=(?:(?<![之公长次三四五])(?:女[一二三四五六七八九十\d]*|生女|育女)[：:\s]+|$))', clean_detail, re.DOTALL)
+    # 提取所有 "子X：" 或 "男X：" 或 "长子"、"次子" 的片段
+    matches = re.finditer(r'(?:^|[；;。，,、\s（\(\[【])(?:(?:子|男)(?:[一二三四五六七八九十\d]*)|长子|次子|三子|四子|五子)[：:\s]*([^；;。\)）\]】\n]+)', detail)
     for m in matches:
-        content = m.group(1)
-        content_prot = re.sub(r'[\(（](.*?)[\)）]', lambda match: '（' + match.group(1).replace('、', '##').replace('，', '##').replace('。', '##').replace('；', '##').replace(' ', '##') + '）', content)
-        raw_items = re.split(r'[、，,\s；;。]', content_prot)
-        for item in raw_items:
-            item_clean = item.replace('##', '、').strip()
-            if not item_clean: continue
-            
-            num_m = re.search(r'(?:子|男)?([一二三四五六七八九十\d]+)', item_clean)
-            if num_m:
-                exp = cn_num_map.get(num_m.group(1), 0)
-                if exp > max_exp: max_exp = exp
-                
-            name_m = re.match(r'^([^\(（\s]+)', item_clean)
-            if name_m:
-                cname = clean_child_name(name_m.group(1))
-                if cname and 1 <= len(cname) <= 4 and not re.search(r'[\d\?？]', cname):
-                    if not any(w in cname for w in invalid_child_words) and not any(k in cname for k in resume_filter_words) and not any(k in cname for k in ['市', '省', '县', '街道', '村', '次', '长', '原', '女', '双胞']):
-                        w_match = re.search(r'(?:妻|配偶|妣)[：:\s]*([^\s\)\）]+)', item_clean)
-                        cwife = w_match.group(1) if w_match else ''
-                        by = extract_general_birth_year(item_clean)
-                        if not any(c['name'] == cname for c in children):
-                            children.append({'name': cname, 'wife': cwife, 'raw': item_clean, 'birth_year': by})
-    return max_exp, children
+        raw_segment = m.group(1).strip()
+        # 清除生平关键词，但保留名字序列
+        raw_segment = re.split(r'(?:(?<![之公长次三四五])女[一二三四五六七八九十\d]*|生女|育女|妻|生于|卒于|适|嫁|工作于|毕业于|曾任|居|往)', raw_segment)[0]
+        # 按顿号、逗号、分号、斜杠、空格拆分
+        names = re.split(r'[、，,\s/；;]+', raw_segment)
+        for nm in names:
+            nm = re.sub(r'[（\(].*?[）\)]', '', nm).strip()
+            # 彻底去除长子、次子、三子、四子、五子、继子、嗣子、嗣长子、嗣次子等前缀
+            nm = re.sub(r'^(?:号|字|名|之子|长子|次子|三子|四子|五子|六子|继子|嗣子|嗣长子|嗣次子|嗣三子|子|男)\s*', '', nm).strip()
+            cname = clean_child_name(nm)
+            if cname and 1 <= len(cname) <= 4 and not re.search(r'[\d\?？]', cname):
+                if not any(w in cname for w in invalid_child_words) and not any(k in cname for k in resume_filter_words) and not any(k in cname for k in ['市', '省', '县', '街道', '村', '次', '长', '原', '女', '双胞', '生', '卒', '居']):
+                    if not any(c['name'] == cname for c in children):
+                        children.append({'name': cname, 'wife': '', 'raw': cname, 'birth_year': None})
+                        
+    return len(children), children
 
 for t in consolidated_lines:
     if '更新于' in t: continue
