@@ -815,7 +815,7 @@ html_template = r"""<!DOCTYPE html>
                 <input type="text" id="searchInput" 
                     oninput="triggerGlobalSearch()" 
                     onfocus="triggerGlobalSearch()" 
-                    placeholder="🔍 检索姓名 (如: 阳亮、筱玉、慧珍、秀华)..." 
+                    placeholder="🔍 检索姓名 / 配偶 / 世代 / 房分..." 
                     autocomplete="off"
                     class="w-full bg-slate-100/90 text-slate-800 placeholder-slate-400 border border-slate-200 rounded-xl pl-8 pr-8 py-2 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition shadow-inner">
                 
@@ -858,6 +858,17 @@ html_template = r"""<!DOCTYPE html>
             </button>
         </div>
     </header>
+
+    <!-- 顶部数据版本与纠错提示条 -->
+    <div class="bg-amber-50/95 border-b border-amber-200/80 px-3 py-1.5 md:px-6 flex items-center justify-between text-[11px] text-amber-900 shadow-sm z-10 shrink-0">
+        <div class="flex items-center space-x-1.5 flex-1 min-w-0">
+            <i class="fa-solid fa-circle-info text-amber-600 text-xs shrink-0"></i>
+            <span class="truncate">本谱基础数据更新于 <strong>2023年12月份</strong>，仅供查阅参考。如有遗漏或信息有误，可点击右上角<strong>【提交纠错/增补信息】</strong>提交修正。</span>
+        </div>
+        <button onclick="this.parentElement.remove()" class="text-amber-700/60 hover:text-amber-900 ml-2 p-0.5 shrink-0" title="关闭提示">
+            <i class="fa-solid fa-xmark text-xs"></i>
+        </button>
+    </div>
 
     <!-- 独立的全局顶层搜索浮窗 -->
     <div id="searchResultsOverlay" class="fixed inset-x-0 top-[90px] md:top-[60px] max-w-lg mx-auto px-3 z-50 hidden">
@@ -1050,7 +1061,7 @@ html_template = r"""<!DOCTYPE html>
                     <!-- 模式 A：在已有族人中搜索匹配 -->
                     <div id="targetSearchBox" class="space-y-1.5">
                         <div class="relative">
-                            <input type="text" id="fbTargetSearchInput" oninput="searchFeedbackTargets()" placeholder="输入要修改的族人姓名 (如: 阳亮、筱玉、维川、胜标)..." class="w-full bg-white border border-blue-200 rounded-xl pl-7 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium">
+                            <input type="text" id="fbTargetSearchInput" oninput="searchFeedbackTargets()" placeholder="输入要修改或增补的族人姓名..." class="w-full bg-white border border-blue-200 rounded-xl pl-7 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium">
                             <i class="fa-solid fa-magnifying-glass absolute left-2.5 top-2.5 text-slate-400 text-[10px]"></i>
                         </div>
                         <div id="fbTargetSearchResults" class="hidden max-h-36 overflow-y-auto bg-white rounded-xl border border-blue-200 shadow-md divide-y divide-slate-100"></div>
