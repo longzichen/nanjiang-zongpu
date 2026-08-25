@@ -147,10 +147,10 @@ def extract_daughters_rich(detail):
                     split_names = [d_name[:2], d_name[2:]]
 
             for pn in split_names:
-                # 过滤明显外姓或标点符号
+                # 过滤明显外姓或标点符号或单字数字
                 if pn and 1 <= len(pn) <= 4 and re.match(r'^[\u4e00-\u9fa5]+$', pn):
                     if not any(pn.startswith(sn) for sn in ['陈', '张', '李', '苏', '王', '刘', '黄', '林', '吴', '游', '沈', '熊', '卢', '巫']):
-                        if pn not in invalid_child_words and pn not in ('无', '早逝', '早夭', '出嗣', '止', '待考', '女', '男', '长', '次', '三', '四', '五', '生', '卒', '居'):
+                        if pn not in invalid_child_words and pn not in ('无', '早逝', '早夭', '出嗣', '止', '待考', '女', '男', '长', '次', '三', '四', '五', '生', '卒', '居', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'):
                             if not any(d['name'] == pn for d in daughters_info):
                                 by = extract_general_birth_year(it_raw)
                                 daughters.append(pn)
@@ -179,8 +179,8 @@ def extract_inline_children(detail):
                     if not any(c['name'] == s_clean for c in children):
                         children.append({'name': s_clean, 'wife': '', 'raw': s_clean, 'birth_year': None, 'sub_children': []})
                 
-    # 2. 提取形如 "子四：拱京、拱岳（出）、拱藩（居缅甸，子五：如桐、如轩、如威、如胜、如明）、拱衍" 的列表项
-    m_lists = re.finditer(r'(?:^|[；;。，,（\(\s])(?:子|男)[一二三四五六七八九十\d]*[：:\s]+([^。;\n]+)', detail)
+    # 2. 提取形如 "子四女一：長子經琅、 次子經琳、三子經畧、四子經燦、女经瑄" 或 "子四：拱京..." 的列表项
+    m_lists = re.finditer(r'(?:^|[；;。，,（\(\s])(?:(?:子|男)[一二三四五六七八九十\d]*(?:女[一二三四五六七八九十\d]*)?|生\d+子\d+女)[：:\s]+([^。;\n]+)', detail)
     for ml in m_lists:
         content = ml.group(1).strip()
         # 保护括号
@@ -197,22 +197,23 @@ def extract_inline_children(detail):
                 sub_content = m_sub.group(1)
                 sub_names = re.split(r'[、，,\s/；;]+', sub_content)
                 for sn in sub_names:
-                    sn_clean = re.sub(r'^(?:号|字|名|子|男|[一二三四五六七八九十\d]+[：:])', '', sn).strip()
+                    sn_clean = re.sub(r'^(?:号|字|名|之子|长子|次子|三子|四子|五子|六子|長子|继子|嗣子|子|男|[一二三四五六七八九十\d]+[：:])\s*', '', sn).strip()
                     sn_clean = re.sub(r'[（\(][出×\?？早逝早夭]+[）\)]', '', sn_clean).strip()
                     sn_clean = clean_child_name(sn_clean)
                     if sn_clean and 1 <= len(sn_clean) <= 4 and sn_clean not in invalid_child_words:
                         sub_children.append(sn_clean)
 
             clean_n = re.sub(r'[（\(].*?[）\)]', '', item_raw).strip()
-            clean_n = re.sub(r'^(?:号|字|名|之子|长子|次子|三子|四子|五子|六子|继子|嗣子|嗣长子|嗣次子|嗣三子|子|男|[一二三四五六七八九十\d]+[：:])\s*', '', clean_n).strip()
+            clean_n = re.sub(r'^(?:号|字|名|之子|长子|次子|三子|四子|五子|六子|長子|继子|嗣子|嗣长子|嗣次子|嗣三子|子|男|[一二三四五六七八九十\d]+[：:])\s*', '', clean_n).strip()
             clean_n = re.split(r'(?:生于|卒于|妻|配|适|嫁|工作于|毕业于|曾任)', clean_n)[0].strip()
             clean_n = clean_child_name(clean_n)
             if clean_n and 1 <= len(clean_n) <= 4 and not re.search(r'[\d\?？]', clean_n):
-                if not re.match(r'^(?:女|女[一二三四五六七八九十\d]+)$', clean_n):
-                    if clean_n not in invalid_child_words and clean_n not in ('无', '早逝', '早夭', '出嗣', '止', '生于', '卒于', '待考', '子', '女', '生'):
-                        # 避免外层添加内嵌的孙辈
-                        if not any(c['name'] == clean_n for c in children):
-                            children.append({'name': clean_n, 'wife': '', 'raw': clean_n, 'birth_year': None, 'sub_children': sub_children})
+                if not re.match(r'^(?:女|女[一二三四五六七八九十\d]+|[一二三四五六七八九十\d]+)$', clean_n):
+                    if not clean_n.startswith('女'):
+                        if clean_n not in invalid_child_words and clean_n not in ('无', '早逝', '早夭', '出嗣', '止', '生于', '卒于', '待考', '子', '女', '生'):
+                            # 避免外层添加内嵌的孙辈
+                            if not any(c['name'] == clean_n for c in children):
+                                children.append({'name': clean_n, 'wife': '', 'raw': clean_n, 'birth_year': None, 'sub_children': sub_children})
                         
     return len(children), children
 
