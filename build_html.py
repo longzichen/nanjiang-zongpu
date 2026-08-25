@@ -508,6 +508,44 @@ if os.path.exists(mod_file_path):
                     target_n['detail'] = f"{target_n.get('detail', '')}。{content}"
                     target_n['search_keywords'] = f"{target_n.get('search_keywords', '')} {content}"
 
+                # 3. 增补子女人数及信息 (动态在树上衍生出下一代新节点)
+                elif '子女' in m_type or '子嗣' in m_type or '女儿' in content or '儿子' in content or '增加' in content:
+                    is_child_female = '女' in content
+                    child_gender = 'female' if is_child_female else 'male'
+                    clean_child = re.sub(r'^(?:增加|增补|添加|补录)?\s*(?:女儿|儿子|长子|次子|三子|长女|次女|三女|子|女)[：:\s]*', '', content).strip()
+                    clean_child = re.split(r'[\s，,。；;（\(]', clean_child)[0].replace('江', '').strip()
+                    c_clean_name = clean_child
+                        
+                    if c_clean_name:
+                        existing_dyn = next((x for x in all_records if x.get('parentId') == target_n['id'] and x.get('clean_name') == c_clean_name), None)
+                        if not existing_dyn:
+                            new_child_node = {
+                                'id': f"node_dyn_{len(all_records) + 1}",
+                                'gen': target_n['gen'] + 1,
+                                'name': c_clean_name,
+                                'clean_name': c_clean_name,
+                                'full_search_name': f"江{c_clean_name}",
+                                'gender': child_gender,
+                                'branch': target_n.get('branch', '二房'),
+                                'father_hint': target_n['name'],
+                                'wife': '',
+                                'wife_full': '',
+                                'daughters': [],
+                                'daughters_info': [],
+                                'search_keywords': f"{c_clean_name} 江{c_clean_name} {target_n['name']}之{'女' if is_child_female else '子'}",
+                                'detail': f"{'父' if target_n.get('gender')!='female' else '母'}: {target_n['name']} ({target_n['gen']}世)。后裔增补入谱成员。",
+                                'word_raw_line': f"【后裔核准增补成员】{'父' if target_n.get('gender')!='female' else '母'}: {target_n['name']} ({target_n['gen']}世)。记载: {content}",
+                                'parentId': target_n['id'],
+                                'audit_records': [{
+                                    'modify_type': m_type,
+                                    'content': content,
+                                    'contributor': contributor,
+                                    'approved_at': approved_at
+                                }]
+                            }
+                            all_records.append(new_child_node)
+                            print(f"🌟 [动态增分子女节点] 在【{target_n['name']}】名下成功增补 {new_child_node['gen']}世 {'👧' if is_child_female else '👦'} {c_clean_name}")
+
                 # 挂载结构化终身审计存证记录（保留历次修改完整档案）
                 records_list = target_n.setdefault('audit_records', [])
                 records_list.append({
@@ -516,8 +554,7 @@ if os.path.exists(mod_file_path):
                     'contributor': contributor,
                     'approved_at': approved_at
                 })
-                print(f"✅ [成功应用永久补丁] 目标: 【{target_n['gen']}世 {target_n['name']}】 | 配偶: {target_n.get('wife')} | 类型: {m_type} | 历史记录数: {len(records_list)}")
-                print(f"✅ [成功应用永久补丁] 目标: 【{target_n['gen']}世 {target_n['name']}】 | 配偶: {target_n.get('wife')} | 类型: {m_type}")
+                print(f"✅ [成功应用永久补丁] 目标: 【{target_n['gen']}世 {target_n['name']}】 | 类型: {m_type} | 历史记录数: {len(records_list)}")
     except Exception as e:
         print(f"⚠️ Error applying modifications ledger: {e}")
 
