@@ -909,8 +909,9 @@
                 .attr("font-size", isMobile ? "9.5px" : "10.5px")
                 .attr("font-weight", d => d.data.gender === 'female' ? "600" : "normal")
                 .text(d => {
+                    if (d.data.wife) return `配: ${d.data.wife}`;
                     if (d.data.gender === 'female') return "👧 直系女儿";
-                    return d.data.wife ? `配: ${d.data.wife}` : (d.data.branch || "");
+                    return (d.data.branch || "");
                 });
 
             const infoBtn = nodeEnter.append("g")
@@ -983,7 +984,7 @@
             const tt = document.getElementById("hoverTooltip");
             document.getElementById("ttName").innerText = `${dData.name} ${dData.gender === 'female' ? '👧(女性/直系女儿)' : '👦(男性)'}`;
             document.getElementById("ttGen").innerText = `${dData.gen}世`;
-            document.getElementById("ttWife").innerText = dData.wife_full ? `配偶: ${dData.wife_full}` : `配偶: 未记录`;
+            document.getElementById("ttWife").innerText = dData.wife ? `配偶: ${dData.wife}` : `配偶: 未记录`;
             
             let daughtersDesc = "女儿: 无";
             if (dData.daughters_info && dData.daughters_info.length > 0) {
@@ -1216,7 +1217,7 @@
             document.getElementById("drawerAvatar").innerText = dData.name.charAt(0);
             document.getElementById("drawerAvatarBox").className = `w-12 h-12 md:w-14 md:h-14 mx-auto rounded-2xl flex items-center justify-center text-lg md:text-xl font-bold text-white shadow-md ${dData.gender === 'female' ? 'bg-gradient-to-tr from-rose-500 to-pink-500' : 'bg-gradient-to-tr from-blue-600 to-indigo-500'}`;
             
-            document.getElementById("drawerWifeFull").innerText = dData.wife_full || "未记录配偶";
+            document.getElementById("drawerWifeFull").innerText = dData.wife ? `配偶: ${dData.wife}` : "未记录配偶";
             document.getElementById("drawerWordRawText").innerText = dData.word_raw_line || dData.detail || "暂无原始记载。";
 
             // 抽屉端渲染后裔核实增补/修改记载
