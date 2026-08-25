@@ -42,6 +42,7 @@ invalid_child_words = {
     '工程师', '高级工程师', '会计师', '医师', '教师', '讲师', '教授', '主任', '局长', '书记', '部长', '大校', '干部', '离休', '毕业', '大学', '学院', '中专', '中学', '小学', '学位', '硕士', '博士', '省部级', '劳模', '裁缝', '油漆工', '木工', '泥水工', '理发师', '贡生', '庠生', '秀才', '清末', '曾任', '任', '县城', '后调入', '回国', '从缅', '后裔', '不明', '后续', '取', '再', '第', '又名', '生', '卒', '居于', '工作', '讳', '嗣', '继', '女', '日', '年', '月', '代', '工', '程师',
     '孙', '孙女', '孙子', '于', '？', '长女', '次女', '三女', '四女', '五女', '长子', '次子', '三子', '四子', '五子', '泉州师范', '师范', '退休', '电大', '集美大学', '大专', '本科', '厦门理工',
     '次', '长', '泉州市', '国家公务员', '公务员', '凤城街道人', '街道人', '村人', '原配', '次配', '继配', '本村人', '双胞胎', '双胞', '出', '二', '三', '四', '五', '六', '七', '八', '九', '十',
+    '区邮政局', '邮政局', '邮电局', '邮政', '税务局', '财政局', '供销社', '粮站', '电业局', '农电站',
     '翰声', '翰声太', '翰声公太', '公太', '婆太', '榴山', '桃山', '茶山', '名扬', '远近', '名扬远近', '经训', '经德堂', '经训楼', '收千税', '成家', '榜样', '奠定', '生活基础', '蛇形地', '四方丘', '园墩上', '犁壁地'
 }
 
@@ -556,7 +557,18 @@ if os.path.exists(mod_file_path):
                                 }]
                             }
                             all_records.append(new_child_node)
-                            print(f"🌟 [动态增分子女节点] 在【{target_n['name']}】名下成功增补 {new_child_node['gen']}世 {'👧' if is_fem else '👦'} {c_name}")
+                # 4. 移除/删除子嗣与错误节点 (如：移除 女儿 区邮政局)
+                elif '移除' in m_type or '删除' in m_type or '移除' in content or '删除' in content or '去除' in content:
+                    m_del = re.search(r'(?:移除|删除|去除)?\s*(?:女儿|儿子|子|女|族人|成员)?[：:\s]*([^\s，,。；;]+)', content)
+                    del_name = m_del.group(1).replace('江', '').strip() if m_del else content.replace('移除', '').replace('删除', '').replace('江', '').strip()
+                    
+                    if del_name:
+                        all_records[:] = [n for n in all_records if not (n.get('parentId') == target_n['id'] and (n.get('name') == del_name or n.get('clean_name') == del_name))]
+                        if 'daughters_info' in target_n:
+                            target_n['daughters_info'] = [d for d in target_n['daughters_info'] if d.get('name') != del_name]
+                        if 'daughters' in target_n:
+                            target_n['daughters'] = [d for d in target_n['daughters'] if d != del_name]
+                        print(f"🗑️ [成功移除错误子节点] 已从【{target_n['name']}】名下彻底移除子节点: {del_name}")
 
                 # 挂载结构化终身审计存证记录（保留历次修改完整档案）
                 records_list = target_n.setdefault('audit_records', [])

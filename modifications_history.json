@@ -72,5 +72,19 @@
     "email": "394731781@qq.com",
     "approved_at": "2026-08-25 14:48",
     "status": "APPROVED"
+  },
+  {
+    "id": "mod_20260825_006",
+    "target_person": "阳亮",
+    "target_gen": 29,
+    "target_father": "庆春",
+    "target_branch": "二房",
+    "modify_type": "修正或移除错误成员",
+    "content": "移除 女儿 区邮政局",
+    "contributor": "江维川",
+    "contact": "longzichen90",
+    "email": "394731781@qq.com",
+    "approved_at": "2026-08-25 15:05",
+    "status": "APPROVED"
   }
 ]
