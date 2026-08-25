@@ -283,11 +283,6 @@
             </div>
             <div id="ttAuditContent" class="text-emerald-900 leading-relaxed whitespace-pre-wrap font-medium"></div>
         </div>
-
-        <button onclick="openFeedbackForCurrent()" class="w-full py-1.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-bold rounded-xl text-[11px] shadow transition flex items-center justify-center space-x-1.5 mt-1.5">
-            <i class="fa-solid fa-pen-to-square text-[10.5px]"></i>
-            <span>为此族人提交纠错 / 增补信息</span>
-        </button>
     </div>
 
     <!-- 手机底部抽屉遮罩 -->
@@ -742,6 +737,7 @@
 
         let rootNodeData, rootHierarchy, treeLayout, svg, gChart, zoomBehavior;
         let selectedNode = null;
+        let lastClickedNode = null;
         let isExpandedAll = false;
 
         let userClientInfo = { ip: '未知', location: '中国', isp: '', userAgent: navigator.userAgent };
@@ -871,12 +867,12 @@
                 .attr("transform", d => `translate(${source.y0},${source.x0})`)
                 .on("click", (event, d) => {
                     if (event.defaultPrevented || isDraggingChart) return;
+                    lastClickedNode = d.data;
                     selectedNode = d.data;
                     toggleNodeChildren(d);
                     highlightThreeGenerations(d);
                 })
                 .on("mouseover", (event, d) => {
-                    selectedNode = d.data;
                     showTooltip(event, d.data);
                 })
                 .on("mousemove", (event, d) => moveTooltip(event))
@@ -2419,7 +2415,7 @@
             document.getElementById("fbTargetSearchInput").value = "";
             document.getElementById("fbTargetSearchResults").classList.add("hidden");
 
-            setFeedbackTarget(targetNode || selectedNode || null);
+            setFeedbackTarget(targetNode || lastClickedNode || selectedNode || null);
 
             document.getElementById("feedbackForm").classList.remove("hidden");
             document.getElementById("fbSuccessBox").classList.add("hidden");
