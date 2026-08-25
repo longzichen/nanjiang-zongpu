@@ -1,0 +1,20 @@
+[
+  {
+    "id": "mod_20260825_001",
+    "target_person": "文",
+    "target_gen": 31,
+    "target_father": "筱钰",
+    "target_branch": "二房",
+    "modify_type": "增补或修正配偶信息",
+    "content": "夫 曾德亮",
+    "contributor": "江祥龙",
+    "contact": "longzichen90",
+    "email": "394731781@qq.com",
+    "approved_at": "2026-08-25",
+    "status": "APPROVED",
+    "parsed_data": {
+      "spouse_name": "曾德亮",
+      "spouse_role": "夫"
+    }
+  }
+]
