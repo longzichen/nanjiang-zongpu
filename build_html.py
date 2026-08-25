@@ -508,32 +508,44 @@ if os.path.exists(mod_file_path):
                     target_n['detail'] = f"{target_n.get('detail', '')}。{content}"
                     target_n['search_keywords'] = f"{target_n.get('search_keywords', '')} {content}"
 
-                # 3. 增补子女人数及信息 (动态在树上衍生出下一代新节点)
-                elif '子女' in m_type or '子嗣' in m_type or '女儿' in content or '儿子' in content or '增加' in content:
-                    is_child_female = '女' in content
-                    child_gender = 'female' if is_child_female else 'male'
-                    clean_child = re.sub(r'^(?:增加|增补|添加|补录)?\s*(?:女儿|儿子|长子|次子|三子|长女|次女|三女|子|女)[：:\s]*', '', content).strip()
-                    clean_child = re.split(r'[\s，,。；;（\(]', clean_child)[0].replace('江', '').strip()
-                    c_clean_name = clean_child
-                        
-                    if c_clean_name:
-                        existing_dyn = next((x for x in all_records if x.get('parentId') == target_n['id'] and x.get('clean_name') == c_clean_name), None)
+                # 3. 增补子女人数及信息 (支持单句复合多子嗣：如“新增 儿子江宏 新增女儿 江岚”)
+                elif '子女' in m_type or '子嗣' in m_type or '女儿' in content or '儿子' in content or '子' in content or '女' in content or '增加' in content or '新增' in content:
+                    children_extracted = []
+                    pattern = r'(?:(?:新增|增加|增补|生|育)?\s*(儿子|女儿|长子|次子|三子|四子|五子|长女|次女|三女|四女|女|子)[：:\s]*([^\s，,。；;]+))'
+                    matches = list(re.finditer(pattern, content))
+                    
+                    if matches:
+                        for m in matches:
+                            role_kw = m.group(1)
+                            raw_name = m.group(2).replace('江', '').strip()
+                            is_female = ('女' in role_kw)
+                            if raw_name and len(raw_name) <= 5:
+                                children_extracted.append((raw_name, 'female' if is_female else 'male', is_female))
+                    else:
+                        clean_child = re.sub(r'^(?:新增|增加|增补|添加|补录)?\s*(?:女儿|儿子|长子|次子|三子|长女|次女|三女|子|女)[：:\s]*', '', content).strip()
+                        clean_child = re.split(r'[\s，,。；;（\(]', clean_child)[0].replace('江', '').strip()
+                        if clean_child:
+                            is_female = ('女' in content)
+                            children_extracted.append((clean_child, 'female' if is_female else 'male', is_female))
+                            
+                    for (c_name, c_gender, is_fem) in children_extracted:
+                        existing_dyn = next((x for x in all_records if x.get('parentId') == target_n['id'] and x.get('clean_name') == c_name), None)
                         if not existing_dyn:
                             new_child_node = {
                                 'id': f"node_dyn_{len(all_records) + 1}",
                                 'gen': target_n['gen'] + 1,
-                                'name': c_clean_name,
-                                'clean_name': c_clean_name,
-                                'full_search_name': f"江{c_clean_name}",
-                                'gender': child_gender,
-                                'branch': target_n.get('branch', '二房'),
+                                'name': c_name,
+                                'clean_name': c_name,
+                                'full_search_name': f"江{c_name}",
+                                'gender': c_gender,
+                                'branch': target_n.get('branch', '宗族分支'),
                                 'father_hint': target_n['name'],
                                 'wife': '',
                                 'wife_full': '',
                                 'daughters': [],
                                 'daughters_info': [],
-                                'search_keywords': f"{c_clean_name} 江{c_clean_name} {target_n['name']}之{'女' if is_child_female else '子'}",
-                                'detail': f"{'父' if target_n.get('gender')!='female' else '母'}: {target_n['name']} ({target_n['gen']}世)。后裔增补入谱成员。",
+                                'search_keywords': f"{c_name} 江{c_name} {target_n['name']}之{'女' if is_fem else '子'}",
+                                'detail': f"{'父' if target_n.get('gender')!='female' else '母'}: {target_n['name']} ({target_n['gen']}世)。后裔核准增补成员。",
                                 'word_raw_line': f"【后裔核准增补成员】{'父' if target_n.get('gender')!='female' else '母'}: {target_n['name']} ({target_n['gen']}世)。记载: {content}",
                                 'parentId': target_n['id'],
                                 'audit_records': [{
@@ -544,7 +556,7 @@ if os.path.exists(mod_file_path):
                                 }]
                             }
                             all_records.append(new_child_node)
-                            print(f"🌟 [动态增分子女节点] 在【{target_n['name']}】名下成功增补 {new_child_node['gen']}世 {'👧' if is_child_female else '👦'} {c_clean_name}")
+                            print(f"🌟 [动态增分子女节点] 在【{target_n['name']}】名下成功增补 {new_child_node['gen']}世 {'👧' if is_fem else '👦'} {c_name}")
 
                 # 挂载结构化终身审计存证记录（保留历次修改完整档案）
                 records_list = target_n.setdefault('audit_records', [])
