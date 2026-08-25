@@ -126,12 +126,13 @@ def main():
         try:
             import genealogy_mailer
             print(f"Sending confirmation receipt to: {parsed['userEmail']}")
-            genealogy_mailer.send_approved_receipt(
+            genealogy_mailer.send_user_approved_receipt(
                 parsed['userEmail'],
                 parsed.get('userName', '宗亲'),
                 parsed.get('targetName', '目标族人'),
                 parsed.get('changeType', '信息修订'),
-                parsed.get('changeContent', '')
+                parsed.get('changeContent', ''),
+                html_filepath="index.html"
             )
         except Exception as e:
             print(f"Mailer notification error: {e}")

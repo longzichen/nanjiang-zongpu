@@ -202,7 +202,7 @@
         </div>
 
         <div class="hidden md:flex items-center space-x-2">
-            <button onclick="openFeedbackModal(null)" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center space-x-1.5">
+            <button onclick="openFeedbackModal(selectedNode || null)" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center space-x-1.5">
                 <i class="fa-solid fa-pen-to-square"></i>
                 <span>提交纠错 / 增补信息</span>
             </button>
@@ -283,6 +283,11 @@
             </div>
             <div id="ttAuditContent" class="text-emerald-900 leading-relaxed whitespace-pre-wrap font-medium"></div>
         </div>
+
+        <button onclick="openFeedbackForCurrent()" class="w-full py-1.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white font-bold rounded-xl text-[11px] shadow transition flex items-center justify-center space-x-1.5 mt-1.5">
+            <i class="fa-solid fa-pen-to-square text-[10.5px]"></i>
+            <span>为此族人提交纠错 / 增补信息</span>
+        </button>
     </div>
 
     <!-- 手机底部抽屉遮罩 -->
@@ -866,10 +871,14 @@
                 .attr("transform", d => `translate(${source.y0},${source.x0})`)
                 .on("click", (event, d) => {
                     if (event.defaultPrevented || isDraggingChart) return;
+                    selectedNode = d.data;
                     toggleNodeChildren(d);
                     highlightThreeGenerations(d);
                 })
-                .on("mouseover", (event, d) => showTooltip(event, d.data))
+                .on("mouseover", (event, d) => {
+                    selectedNode = d.data;
+                    showTooltip(event, d.data);
+                })
                 .on("mousemove", (event, d) => moveTooltip(event))
                 .on("mouseout", () => hideTooltip());
 

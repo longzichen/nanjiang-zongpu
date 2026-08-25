@@ -68,8 +68,8 @@ def send_admin_alert(issue_info):
         print(f"❌ 发送管理员通知邮件失败: {e}")
         return False
 
-def send_user_approved_receipt(user_email, user_name, target_name, html_filepath):
-    """当管理员审核通过后，给用户发送回执邮件并附带最新 HTML 附件"""
+def send_user_approved_receipt(user_email, user_name, target_name, change_type, change_content, html_filepath="index.html"):
+    """当管理员审核通过后，给用户发送回执邮件并附带在线访问地址与最新离线 HTML 附件"""
     if not user_email or '@' not in user_email:
         print("ℹ️ 用户未提供有效邮箱，跳过用户邮件发送。")
         return False
@@ -81,22 +81,61 @@ def send_user_approved_receipt(user_email, user_name, target_name, html_filepath
         msg = MIMEMultipart()
         msg['From'] = formataddr((str(Header('南江江氏宗族理事会', 'utf-8')), SMTP_USER))
         msg['To'] = formataddr((str(Header(user_name or '宗亲', 'utf-8')), user_email))
-        msg['Subject'] = Header(f"【南江宗谱】您提交的族人信息修改已审核通过并生效！", 'utf-8')
+        msg['Subject'] = Header(f"【南江宗谱】您提交的族人信息修改已审核通过并正式生效！", 'utf-8')
+
+        live_url = "https://longzichen.github.io/nanjiang-zongpu/"
 
         html_body = f"""
-        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: auto; padding: 25px; background: #f8fafc; border-radius: 16px; border: 1px solid #e2e8f0;">
-            <h2 style="color: #059669; margin-top: 0;">🎉 尊敬的 {user_name or '宗亲'}：</h2>
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', sans-serif; max-width: 620px; margin: auto; padding: 25px; background: #f8fafc; border-radius: 18px; border: 1px solid #e2e8f0;">
+            <div style="text-align: center; margin-bottom: 20px; border-bottom: 2px solid #10b981; padding-bottom: 15px;">
+                <h2 style="color: #047857; margin: 0; font-size: 22px;">🎉 南江宗谱 · 增补与纠错审核通过通知</h2>
+                <p style="color: #64748b; font-size: 13px; margin-top: 5px;">族牒修葺 · 慎终追远 · 昭穆有序</p>
+            </div>
+
+            <p style="font-size: 15px; color: #1e293b; line-height: 1.8;">
+                尊敬的 <b>{user_name or '宗亲'}</b>：您好！
+            </p>
             <p style="font-size: 14px; color: #334155; line-height: 1.8;">
-                您向南江宗族理事会提交的关于【<b>{target_name}</b>】的信息修改/增补申请，已由宗族管理员<b>审核通过</b>并正式合入最新宗谱数据库！
+                您向南江宗族理事会提交的关于【<b style="color: #1d4ed8;">{target_name}</b>】的信息增补/修正申请，已由宗族管理员<b>核准通过</b>并已永久合入南江江氏宗谱数字化总数据库！
             </p>
 
-            <div style="background: #ecfdf5; padding: 15px; border-radius: 12px; border: 1px solid #a7f3d0; margin: 20px 0;">
-                <div style="font-weight: bold; color: #065f46; font-size: 14px; margin-bottom: 8px;">📎 最新版本已作为邮件附件发送：</div>
-                <div style="font-size: 13px; color: #047857;">
-                    附件名称：<b>南江宗谱关系网（最新完美版）.html</b><br>
-                    使用方法：下载附件后，直接在手机或电脑浏览器中双击即可<b>100% 离线高清浏览、查询两人及多人世系关系</b>！
+            <div style="background: #ffffff; padding: 16px; border-radius: 12px; border: 1px solid #cbd5e1; margin: 20px 0; box-shadow: 0 2px 5px rgba(0,0,0,0.03);">
+                <div style="font-weight: bold; color: #0f172a; font-size: 14px; margin-bottom: 8px; border-bottom: 1px dashed #e2e8f0; padding-bottom: 6px;">📋 审核生效凭证：</div>
+                <table style="width: 100%; font-size: 13.5px; line-height: 1.8; color: #475569;">
+                    <tr><td style="width: 100px; color: #64748b; font-weight: bold;">目标族人：</td><td style="color: #1e293b; font-weight: bold;">{target_name}</td></tr>
+                    <tr><td style="color: #64748b; font-weight: bold;">修改类型：</td><td><span style="background: #ecfdf5; color: #047857; padding: 2px 8px; border-radius: 6px; font-weight: bold; font-size: 12px;">{change_type}</span></td></tr>
+                    <tr><td style="color: #64748b; font-weight: bold;">增补内容：</td><td style="color: #047857; font-weight: bold;">{change_content}</td></tr>
+                    <tr><td style="color: #64748b; font-weight: bold;">入谱状态：</td><td><span style="background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 6px; font-weight: bold; font-size: 12px;">已永久存档（永不丢失）</span></td></tr>
+                </table>
+            </div>
+
+            <!-- 在线访问入口 -->
+            <div style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); padding: 18px; border-radius: 14px; border: 1px solid #bfdbfe; text-align: center; margin: 20px 0;">
+                <div style="font-size: 14px; color: #1e40af; font-weight: bold; margin-bottom: 10px;">🌐 方式一：公网在线实时查验与交互</div>
+                <a href="{live_url}" style="display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 11px 28px; border-radius: 10px; font-weight: bold; font-size: 14px; box-shadow: 0 4px 10px rgba(37,99,235,0.25);">
+                    🚀 点击直接打开最新宗谱世系网络
+                </a>
+                <div style="font-size: 11.5px; color: #64748b; margin-top: 8px;">网址：<a href="{live_url}" style="color: #2563eb;">{live_url}</a></div>
+            </div>
+
+            <!-- 离线附件提示 -->
+            <div style="background: #f0fdf4; padding: 16px; border-radius: 14px; border: 1px solid #bbf7d0; margin: 20px 0;">
+                <div style="font-weight: bold; color: #166534; font-size: 13.5px; margin-bottom: 6px;">📎 方式二：单文件离线珍藏版（已作为邮件附件随信发送）</div>
+                <div style="font-size: 12.5px; color: #15803d; line-height: 1.7;">
+                    附件名称：<b>南江江氏宗谱世系关系网.html</b><br>
+                    使用方式：下载附件后，在任何手机或电脑浏览器中双击即可<b>100% 离线免流量浏览、缩放全图、查询世系亲属称谓</b>！
                 </div>
             </div>
+
+            <p style="font-size: 13px; color: #64748b; line-height: 1.7; text-align: center; margin-top: 25px;">
+                修谱续帙，弘扬祖德。万分感谢您对南江江氏家族谱牒完善作出的宝贵贡献！
+            </p>
+
+            <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center;">
+                南江江氏宗族理事会 · 数字化谱牒管理中心 敬上
+            </div>
+        </div>
+        """
 
             <p style="font-size: 13px; color: #64748b; line-height: 1.6;">
                 修谱续帙，弘扬祖德。万分感谢您对南江江氏家族谱系完善所作出的宝贵贡献！
