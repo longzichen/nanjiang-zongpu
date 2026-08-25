@@ -8,27 +8,35 @@ from datetime import datetime
 sys.stdout.reconfigure(encoding='utf-8')
 
 def parse_issue_body(body_text):
-    """解析 GitHub Issue 中的工单字段"""
+    """解析 GitHub Issue 中的工单字段，自动清洗 Markdown 格式"""
     data = {}
-    m_user = re.search(r'提交人姓名[：:\s]*([^\n]+)', body_text)
+    clean_lines = []
+    for line in body_text.splitlines():
+        l = re.sub(r'^[-\s*#]+', '', line)
+        l = l.replace('**', '').replace('__', '').strip()
+        clean_lines.append(l)
+    
+    clean_text = '\n'.join(clean_lines)
+
+    m_user = re.search(r'提交人姓名[：:\s]*([^\n]+)', clean_text)
     if m_user: data['userName'] = m_user.group(1).strip()
     
-    m_phone = re.search(r'联系电话[^\n]*[：:\s]*([^\n]+)', body_text)
+    m_phone = re.search(r'联系电话[^\n]*[：:\s]*([^\n]+)', clean_text)
     if m_phone: data['userPhone'] = m_phone.group(1).strip()
     
-    m_email = re.search(r'回发邮箱[：:\s]*([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', body_text)
+    m_email = re.search(r'回发邮箱[：:\s]*([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', clean_text)
     if m_email: data['userEmail'] = m_email.group(1).strip()
     
-    m_type = re.search(r'修改类型[：:\s]*([^\n]+)', body_text)
+    m_type = re.search(r'修改类型[：:\s]*([^\n]+)', clean_text)
     if m_type: data['changeType'] = m_type.group(1).strip()
     
-    m_target = re.search(r'目标族人[：:\s]*([^\n]+)', body_text)
+    m_target = re.search(r'目标族人[：:\s]*([^\n]+)', clean_text)
     if m_target: data['targetName'] = m_target.group(1).strip()
 
-    m_father = re.search(r'父亲[：:\s]*([^\s，,/]+)', body_text)
+    m_father = re.search(r'父亲[：:\s]*([^\s，,/]+)', clean_text)
     if m_father: data['clueFather'] = m_father.group(1).strip()
     
-    m_content = re.search(r'具体修改内容[：:\s]*([\s\S]+?)(?:---|📍|$)', body_text)
+    m_content = re.search(r'具体修改内容[：:\s]*([\s\S]+?)(?:---|📍|$)', clean_text)
     if m_content: data['changeContent'] = m_content.group(1).strip()
     
     return data

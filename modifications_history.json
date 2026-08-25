@@ -16,5 +16,18 @@
       "spouse_name": "曾德亮",
       "spouse_role": "夫"
     }
+  },
+  {
+    "id": "mod_20260825111039_2",
+    "target_person": "秀华",
+    "target_gen": 30,
+    "target_father": "庆春",
+    "modify_type": "增补或修正配偶信息",
+    "content": "增加 夫 江阳亮",
+    "contributor": "江维川",
+    "contact": "回发邮箱：394731781@qq.com",
+    "email": "394731781@qq.com",
+    "approved_at": "2026-08-25",
+    "status": "APPROVED"
   }
 ]

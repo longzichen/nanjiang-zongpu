@@ -11,19 +11,25 @@ output_html_path_0 = r'E:\闲杂\族谱\南江宗谱关系网（2026终极全对
 output_html_path_1 = r'E:\闲杂\族谱\南江宗谱关系网（最新完美版）.html'
 output_html_path_2 = r'E:\闲杂\族谱\南江宗谱关系网（现代手机增强版）.html'
 
-doc = docx.Document(docx_path)
-
 line_start_re = re.compile(r'^(?:[1-9]\d?\s*[世代代世]|[1-9]\d?\s+[\u4e00-\u9fa5]{1,6}\s+)')
 
-raw_paragraphs = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+raw_paragraphs = []
 consolidated_lines = []
 
-for line in raw_paragraphs:
-    if line_start_re.match(line) or '家谱' in line or '宗谱' in line or '更新于' in line:
-        consolidated_lines.append(line)
-    else:
-        if consolidated_lines:
-            consolidated_lines[-1] += line
+if os.path.exists(docx_path):
+    try:
+        doc = docx.Document(docx_path)
+        raw_paragraphs = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+        for line in raw_paragraphs:
+            if line_start_re.match(line) or '家谱' in line or '宗谱' in line or '更新于' in line:
+                consolidated_lines.append(line)
+            else:
+                if consolidated_lines:
+                    consolidated_lines[-1] += line
+    except Exception as e:
+        print(f"Warning: Could not read Word doc: {e}")
+else:
+    print(f"Running in cloud or offline mode (Word doc not found at {docx_path}). Will load base dataset from JSON.")
 
 records = []
 current_branch = '长房'
@@ -423,6 +429,84 @@ for r in (records + additional_nodes):
 
 all_records = records + additional_nodes + daughter_nodes
 
+if not all_records:
+    base_json_path = os.path.join(os.path.dirname(__file__), r'nanjiang-zongpu\genealogy_data.json')
+    if not os.path.exists(base_json_path):
+        base_json_path = os.path.join(os.path.dirname(__file__), 'genealogy_data.json')
+    if os.path.exists(base_json_path):
+        try:
+            with open(base_json_path, 'r', encoding='utf-8') as f:
+                base_data = json.load(f)
+                all_nodes_loaded = base_data.get('all_nodes', [])
+                if all_nodes_loaded and all_nodes_loaded[0].get('id') == 'root_0':
+                    all_records = all_nodes_loaded[1:]
+                else:
+                    all_records = all_nodes_loaded
+            print(f"Successfully loaded {len(all_records)} base nodes from genealogy_data.json in cloud mode.")
+        except Exception as e:
+            print(f"Error reading base json: {e}")
+
+# ----------------- 终身永久增补账本加载与补丁应用 (Permanent Patch Engine) -----------------
+mod_file_path = os.path.join(os.path.dirname(__file__), r'nanjiang-zongpu\modifications_history.json')
+if not os.path.exists(mod_file_path):
+    mod_file_path = os.path.join(os.path.dirname(__file__), 'modifications_history.json')
+
+if os.path.exists(mod_file_path):
+    try:
+        with open(mod_file_path, 'r', encoding='utf-8') as f:
+            mod_list = json.load(f)
+            
+        print(f"Loaded permanent modifications ledger: {len(mod_list)} approved changes")
+        for mod in mod_list:
+            t_name = mod.get('target_person', '').replace('江', '').strip()
+            t_gen = mod.get('target_gen')
+            t_father = mod.get('target_father', '').replace('江', '').strip()
+            m_type = mod.get('modify_type', '')
+            content = mod.get('content', '')
+            contributor = mod.get('contributor', '宗亲')
+            approved_at = mod.get('approved_at', '2026')
+            
+            # 在 all_records 中寻找匹配目标
+            matched_nodes = []
+            for n in all_records:
+                if n['name'] == t_name or n['clean_name'] == t_name:
+                    if t_gen is None or n['gen'] == t_gen:
+                        if not t_father or n.get('father_hint') == t_father:
+                            matched_nodes.append(n)
+                            
+            if not matched_nodes:
+                # 仅按名字和世代模糊匹配
+                matched_nodes = [n for n in all_records if (n['name'] == t_name or n['clean_name'] == t_name) and (t_gen is None or n['gen'] == t_gen)]
+
+            for target_n in matched_nodes:
+                # 1. 增补或修正配偶信息
+                if '配偶' in m_type or '夫' in content or '妻' in content or '适' in content or '嫁' in content:
+                    spouse_clean = re.sub(r'^(?:增加|增补|修正|添加)?\s*(?:夫|丈夫|妻|妻子|配偶|原配|次配|继配|适|嫁|配)[：:\s]*', '', content).strip()
+                    spouse_clean = re.split(r'(?:生于|卒于|工作|毕业|居|籍贯|原籍)', spouse_clean)[0].strip()
+                    is_female = target_n.get('gender') == 'female'
+                    role_prefix = '夫' if is_female else '妻'
+                    
+                    target_n['wife'] = spouse_clean
+                    target_n['wife_full'] = f"{role_prefix} {spouse_clean}"
+                    target_n['spouse_role'] = role_prefix
+                    target_n['search_keywords'] = f"{target_n.get('search_keywords', '')} {spouse_clean} {role_prefix}{spouse_clean}"
+                    
+                # 2. 增补生平/字号/学历
+                elif '生平' in m_type or '字号' in m_type:
+                    target_n['detail'] = f"{target_n.get('detail', '')}。{content}"
+                    target_n['search_keywords'] = f"{target_n.get('search_keywords', '')} {content}"
+
+                # 挂载结构化审计存证记录
+                target_n.setdefault('audit_records', []).append({
+                    'modify_type': m_type,
+                    'content': content,
+                    'contributor': contributor,
+                    'approved_at': approved_at
+                })
+                print(f"✅ [成功应用永久补丁] 目标: 【{target_n['gen']}世 {target_n['name']}】 | 类型: {m_type} | 内容: {content}")
+    except Exception as e:
+        print(f"⚠️ Error applying modifications ledger: {e}")
+
 root_node = {
     'id': 'root_0',
     'name': '南江江氏始祖',
@@ -648,7 +732,7 @@ html_template = r"""<!DOCTYPE html>
         </div>
 
         <div class="hidden md:flex items-center space-x-2">
-            <button onclick="openFeedbackModal(null)" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center space-x-1.5">
+            <button onclick="openFeedbackModal(selectedNode || null)" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center space-x-1.5">
                 <i class="fa-solid fa-pen-to-square"></i>
                 <span>提交纠错 / 增补信息</span>
             </button>
@@ -717,6 +801,18 @@ html_template = r"""<!DOCTYPE html>
             </div>
             <div id="ttDetail" class="whitespace-pre-wrap break-words">Word 原始记载...</div>
         </div>
+
+        <!-- 后裔核实增补/修改记载 -->
+        <div id="ttAuditBox" class="bg-emerald-50/95 p-2.5 rounded-xl border border-emerald-300 text-[11px] text-emerald-950 font-sans shadow-sm hidden">
+            <div class="font-bold text-[10.5px] text-emerald-900 mb-1 flex items-center justify-between">
+                <span class="flex items-center space-x-1">
+                    <i class="fa-solid fa-circle-check text-emerald-600"></i>
+                    <span>后裔核实增补 / 修订记载</span>
+                </span>
+                <span class="text-[9px] px-1.5 py-0.5 bg-emerald-200 text-emerald-800 rounded font-semibold">已核准入谱</span>
+            </div>
+            <div id="ttAuditContent" class="text-emerald-900 leading-relaxed whitespace-pre-wrap font-medium"></div>
+        </div>
     </div>
 
     <!-- 手机底部抽屉遮罩 -->
@@ -754,6 +850,18 @@ html_template = r"""<!DOCTYPE html>
                         <span class="text-[9.5px] px-1.5 py-0.5 bg-amber-200/60 text-amber-800 rounded font-semibold">完整无截断</span>
                     </div>
                     <div id="drawerWordRawText" class="text-amber-950 leading-relaxed text-[11.5px] font-mono bg-white/80 p-2.5 rounded-xl border border-amber-200/60 select-all whitespace-pre-wrap break-words shadow-inner">无原始记载</div>
+                </div>
+
+                <!-- 抽屉端 后裔核实增补/修改记载 -->
+                <div id="drawerAuditBox" class="bg-emerald-50/90 p-3 rounded-2xl border border-emerald-300 shadow-sm hidden">
+                    <div class="font-bold text-emerald-950 text-[11px] md:text-xs mb-1.5 flex items-center justify-between">
+                        <span class="flex items-center space-x-1.5">
+                            <i class="fa-solid fa-circle-check text-emerald-600"></i>
+                            <span class="text-emerald-900 font-bold">后裔核实增补 / 修订记载</span>
+                        </span>
+                        <span class="text-[9.5px] px-1.5 py-0.5 bg-emerald-200 text-emerald-800 rounded font-semibold">已审核入谱</span>
+                    </div>
+                    <div id="drawerAuditContent" class="text-emerald-950 leading-relaxed text-[11.5px] font-sans bg-white/80 p-2.5 rounded-xl border border-emerald-200/60 select-all whitespace-pre-wrap break-words shadow-inner font-medium"></div>
                 </div>
 
                 <div class="bg-pink-50/70 p-2.5 rounded-xl border border-pink-100">
@@ -1159,6 +1267,7 @@ html_template = r"""<!DOCTYPE html>
 
         let rootNodeData, rootHierarchy, treeLayout, svg, gChart, zoomBehavior;
         let selectedNode = null;
+        let lastClickedNode = null;
         let isExpandedAll = false;
 
         let userClientInfo = { ip: '未知', location: '中国', isp: '', userAgent: navigator.userAgent };
@@ -1176,7 +1285,6 @@ html_template = r"""<!DOCTYPE html>
         const nodeHeight = isMobile ? 46 : 52;
 
         async function fetchClientLocation() {
-            // 后台静默多源测速探测 IP 与省市信息（前端不展示任何加载字样，提交时自动上报）
             const apis = [
                 'https://ipapi.co/json/',
                 'https://api.ipify.org?format=json',
@@ -1289,10 +1397,14 @@ html_template = r"""<!DOCTYPE html>
                 .attr("transform", d => `translate(${source.y0},${source.x0})`)
                 .on("click", (event, d) => {
                     if (event.defaultPrevented || isDraggingChart) return;
+                    lastClickedNode = d.data;
+                    selectedNode = d.data;
                     toggleNodeChildren(d);
                     highlightThreeGenerations(d);
                 })
-                .on("mouseover", (event, d) => showTooltip(event, d.data))
+                .on("mouseover", (event, d) => {
+                    showTooltip(event, d.data);
+                })
                 .on("mousemove", (event, d) => moveTooltip(event))
                 .on("mouseout", () => hideTooltip());
 
@@ -1332,8 +1444,9 @@ html_template = r"""<!DOCTYPE html>
                 .attr("font-size", isMobile ? "9.5px" : "10.5px")
                 .attr("font-weight", d => d.data.gender === 'female' ? "600" : "normal")
                 .text(d => {
+                    if (d.data.wife) return `配: ${d.data.wife}`;
                     if (d.data.gender === 'female') return "👧 直系女儿";
-                    return d.data.wife ? `配: ${d.data.wife}` : (d.data.branch || "");
+                    return (d.data.branch || "");
                 });
 
             const infoBtn = nodeEnter.append("g")
@@ -1406,7 +1519,7 @@ html_template = r"""<!DOCTYPE html>
             const tt = document.getElementById("hoverTooltip");
             document.getElementById("ttName").innerText = `${dData.name} ${dData.gender === 'female' ? '👧(女性/直系女儿)' : '👦(男性)'}`;
             document.getElementById("ttGen").innerText = `${dData.gen}世`;
-            document.getElementById("ttWife").innerText = dData.wife_full ? `配偶: ${dData.wife_full}` : `配偶: 未记录`;
+            document.getElementById("ttWife").innerText = dData.wife ? `配偶: ${dData.wife}` : `配偶: 未记录`;
             
             let daughtersDesc = "女儿: 无";
             if (dData.daughters_info && dData.daughters_info.length > 0) {
@@ -1417,6 +1530,18 @@ html_template = r"""<!DOCTYPE html>
             document.getElementById("ttDaughters").innerText = daughtersDesc;
             
             document.getElementById("ttDetail").innerText = dData.word_raw_line || dData.detail || "暂无原始记载。";
+            
+            // 渲染后裔核实增补/修改记载
+            const auditBox = document.getElementById("ttAuditBox");
+            const auditContent = document.getElementById("ttAuditContent");
+            if (dData.audit_records && dData.audit_records.length > 0) {
+                const auditText = dData.audit_records.map(a => `• 【${a.modify_type}】${a.content} (提交人: ${a.contributor} · ${a.approved_at})`).join('\n');
+                auditContent.innerText = auditText;
+                auditBox.classList.remove("hidden");
+            } else {
+                auditBox.classList.add("hidden");
+            }
+
             tt.classList.remove("hidden");
             moveTooltip(event);
         }
@@ -1627,8 +1752,19 @@ html_template = r"""<!DOCTYPE html>
             document.getElementById("drawerAvatar").innerText = dData.name.charAt(0);
             document.getElementById("drawerAvatarBox").className = `w-12 h-12 md:w-14 md:h-14 mx-auto rounded-2xl flex items-center justify-center text-lg md:text-xl font-bold text-white shadow-md ${dData.gender === 'female' ? 'bg-gradient-to-tr from-rose-500 to-pink-500' : 'bg-gradient-to-tr from-blue-600 to-indigo-500'}`;
             
-            document.getElementById("drawerWifeFull").innerText = dData.wife_full || "未记录配偶";
+            document.getElementById("drawerWifeFull").innerText = dData.wife ? `配偶: ${dData.wife}` : "未记录配偶";
             document.getElementById("drawerWordRawText").innerText = dData.word_raw_line || dData.detail || "暂无原始记载。";
+
+            // 抽屉端渲染后裔核实增补/修改记载
+            const drawerAuditBox = document.getElementById("drawerAuditBox");
+            const drawerAuditContent = document.getElementById("drawerAuditContent");
+            if (dData.audit_records && dData.audit_records.length > 0) {
+                const auditText = dData.audit_records.map(a => `• 【${a.modify_type}】${a.content} (提交人: ${a.contributor} · ${a.approved_at})`).join('\n');
+                drawerAuditContent.innerText = auditText;
+                drawerAuditBox.classList.remove("hidden");
+            } else {
+                drawerAuditBox.classList.add("hidden");
+            }
 
             const fatherNode = rawData.find(x => x.id === dData.parentId);
             let gFatherNode = null;
@@ -2809,7 +2945,7 @@ html_template = r"""<!DOCTYPE html>
             document.getElementById("fbTargetSearchInput").value = "";
             document.getElementById("fbTargetSearchResults").classList.add("hidden");
 
-            setFeedbackTarget(targetNode || selectedNode || null);
+            setFeedbackTarget(targetNode || lastClickedNode || selectedNode || null);
 
             document.getElementById("feedbackForm").classList.remove("hidden");
             document.getElementById("fbSuccessBox").classList.add("hidden");
@@ -2925,13 +3061,19 @@ html_template = r"""<!DOCTYPE html>
 
 final_html = html_template.replace('DATA_PLACEHOLDER', json_data_str)
 
-with open(output_html_path_0, 'w', encoding='utf-8') as f:
-    f.write(final_html)
+targets = [
+    output_html_path_0,
+    output_html_path_1,
+    output_html_path_2,
+    r'E:\闲杂\族谱\南江江氏宗谱世系关系网.html',
+    r'C:\Users\longzichen\.gemini\antigravity\scratch\nanjiang-zongpu\index.html'
+]
 
-with open(output_html_path_1, 'w', encoding='utf-8') as f:
-    f.write(final_html)
+for t_path in targets:
+    try:
+        with open(t_path, 'w', encoding='utf-8') as f:
+            f.write(final_html)
+    except Exception as e:
+        print(f"Error writing to {t_path}: {e}")
 
-with open(output_html_path_2, 'w', encoding='utf-8') as f:
-    f.write(final_html)
-
-print(f"SUCCESS: Generated ultimate user-friendly feedback HTML: {output_html_path_0}")
+print(f"SUCCESS: Synchronized all 5 HTML files with latest pedigree data!")
