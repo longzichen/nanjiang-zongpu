@@ -480,9 +480,21 @@ if os.path.exists(mod_file_path):
                 matched_nodes = [n for n in all_records if (n['name'] == t_name or n['clean_name'] == t_name) and (t_gen is None or n['gen'] == t_gen)]
 
             for target_n in matched_nodes:
-                # 1. 增补或修正配偶信息
-                if '配偶' in m_type or '夫' in content or '妻' in content or '适' in content or '嫁' in content or '阳亮' in content:
-                    # 高级自然语言替换提取器
+                # 1. 最高优先级：移除/删除子嗣与错误节点 (如：移除 女儿 区邮政局)
+                if '移除' in m_type or '删除' in m_type or '移除' in content or '删除' in content or '去除' in content:
+                    m_del = re.search(r'(?:移除|删除|去除)?\s*(?:女儿|儿子|子|女|族人|成员)?[：:\s]*([^\s，,。；;]+)', content)
+                    del_name = m_del.group(1).replace('江', '').strip() if m_del else content.replace('移除', '').replace('删除', '').replace('江', '').strip()
+                    
+                    if del_name:
+                        all_records[:] = [n for n in all_records if not (n.get('parentId') == target_n['id'] and (n.get('name') == del_name or n.get('clean_name') == del_name))]
+                        if 'daughters_info' in target_n:
+                            target_n['daughters_info'] = [d for d in target_n['daughters_info'] if d.get('name') != del_name]
+                        if 'daughters' in target_n:
+                            target_n['daughters'] = [d for d in target_n['daughters'] if d != del_name]
+                        print(f"🗑️ [成功移除错误子节点] 已从【{target_n['name']}】名下彻底移除子节点: {del_name}")
+
+                # 2. 增补或修正配偶信息
+                elif '配偶' in m_type or '夫' in content or '妻' in content or '适' in content or '嫁' in content or '阳亮' in content:
                     m_rep = re.search(r'(?:改成|修改为|改为|变更为|更新为|调整为)[：:\s]*([^\s，,。；;]+)', content)
                     if m_rep:
                         spouse_clean = m_rep.group(1).strip()
@@ -504,12 +516,12 @@ if os.path.exists(mod_file_path):
                     target_n['spouse_role'] = role_prefix
                     target_n['search_keywords'] = f"{target_n.get('search_keywords', '')} {spouse_clean} {role_prefix}{spouse_clean}"
                     
-                # 2. 增补生平/字号/学历
+                # 3. 增补生平/字号/学历
                 elif '生平' in m_type or '字号' in m_type:
                     target_n['detail'] = f"{target_n.get('detail', '')}。{content}"
                     target_n['search_keywords'] = f"{target_n.get('search_keywords', '')} {content}"
 
-                # 3. 增补子女人数及信息 (支持单句复合多子嗣：如“新增 儿子江宏 新增女儿 江岚”)
+                # 4. 增补子女人数及信息 (支持单句复合多子嗣：如“新增 儿子江宏 新增女儿 江岚”)
                 elif '子女' in m_type or '子嗣' in m_type or '女儿' in content or '儿子' in content or '子' in content or '女' in content or '增加' in content or '新增' in content:
                     children_extracted = []
                     pattern = r'(?:(?:新增|增加|增补|生|育)?\s*(儿子|女儿|长子|次子|三子|四子|五子|长女|次女|三女|四女|女|子)[：:\s]*([^\s，,。；;]+))'
@@ -520,12 +532,12 @@ if os.path.exists(mod_file_path):
                             role_kw = m.group(1)
                             raw_name = m.group(2).replace('江', '').strip()
                             is_female = ('女' in role_kw)
-                            if raw_name and len(raw_name) <= 5:
+                            if raw_name and len(raw_name) <= 5 and not any(suf in raw_name for suf in ['村人', '街道人', '镇人', '局', '站', '社']):
                                 children_extracted.append((raw_name, 'female' if is_female else 'male', is_female))
                     else:
                         clean_child = re.sub(r'^(?:新增|增加|增补|添加|补录)?\s*(?:女儿|儿子|长子|次子|三子|长女|次女|三女|子|女)[：:\s]*', '', content).strip()
                         clean_child = re.split(r'[\s，,。；;（\(]', clean_child)[0].replace('江', '').strip()
-                        if clean_child:
+                        if clean_child and not any(suf in clean_child for suf in ['村人', '街道人', '镇人', '局', '站', '社']):
                             is_female = ('女' in content)
                             children_extracted.append((clean_child, 'female' if is_female else 'male', is_female))
                             
@@ -557,18 +569,7 @@ if os.path.exists(mod_file_path):
                                 }]
                             }
                             all_records.append(new_child_node)
-                # 4. 移除/删除子嗣与错误节点 (如：移除 女儿 区邮政局)
-                elif '移除' in m_type or '删除' in m_type or '移除' in content or '删除' in content or '去除' in content:
-                    m_del = re.search(r'(?:移除|删除|去除)?\s*(?:女儿|儿子|子|女|族人|成员)?[：:\s]*([^\s，,。；;]+)', content)
-                    del_name = m_del.group(1).replace('江', '').strip() if m_del else content.replace('移除', '').replace('删除', '').replace('江', '').strip()
-                    
-                    if del_name:
-                        all_records[:] = [n for n in all_records if not (n.get('parentId') == target_n['id'] and (n.get('name') == del_name or n.get('clean_name') == del_name))]
-                        if 'daughters_info' in target_n:
-                            target_n['daughters_info'] = [d for d in target_n['daughters_info'] if d.get('name') != del_name]
-                        if 'daughters' in target_n:
-                            target_n['daughters'] = [d for d in target_n['daughters'] if d != del_name]
-                        print(f"🗑️ [成功移除错误子节点] 已从【{target_n['name']}】名下彻底移除子节点: {del_name}")
+                            print(f"🌟 [动态增分子女节点] 在【{target_n['name']}】名下成功增补 {new_child_node['gen']}世 {'👧' if is_fem else '👦'} {c_name}")
 
                 # 挂载结构化终身审计存证记录（保留历次修改完整档案）
                 records_list = target_n.setdefault('audit_records', [])
@@ -579,6 +580,16 @@ if os.path.exists(mod_file_path):
                     'approved_at': approved_at
                 })
                 print(f"✅ [成功应用永久补丁] 目标: 【{target_n['gen']}世 {target_n['name']}】 | 类型: {m_type} | 历史记录数: {len(records_list)}")
+                
+        # 全局铁壁假节点扫除器 (清扫所有村人、街道人、机构名假节点)
+        bad_suffixes = ('村人', '街道人', '镇人', '县人', '市人', '局', '站', '社', '厂', '工作', '退休')
+        for n in all_records:
+            if 'daughters_info' in n:
+                n['daughters_info'] = [d for d in n['daughters_info'] if not any(d.get('name', '').endswith(suf) or suf in d.get('name', '') for suf in bad_suffixes)]
+            if 'daughters' in n:
+                n['daughters'] = [d for d in n['daughters'] if not any(d.endswith(suf) or suf in d for suf in bad_suffixes)]
+        all_records[:] = [n for n in all_records if not any(n.get('name', '').endswith(suf) or suf in n.get('name', '') for suf in bad_suffixes)]
+        print(f"🧹 全局完成假节点扫除，当前全谱纯正节点数: {len(all_records)}")
     except Exception as e:
         print(f"⚠️ Error applying modifications ledger: {e}")
 
