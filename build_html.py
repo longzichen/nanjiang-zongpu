@@ -110,12 +110,13 @@ def clean_child_name(cname):
 
 def extract_wife(detail):
     main_text = re.split(r'子[一二三四五六七八九十\d]+[：:]|男[一二三四五六七八九十\d]+[：:]|女[一二三四五六七八九十\d]+[：:]|孙[一二三四五六七八九十\d]*[：:]', detail)[0]
-    matches = re.findall(r'(?:妣|妻|配偶|原配|次配|继妻|继配)[：:\s]*([^\d。；;\n，,（\(]+)', main_text)
+    matches = re.findall(r'(?<!夫)(?:妣|妻|配偶|原配|次配|继妻|继配)[：:\s]+([^\d。；;\n，,（\(]+)', main_text)
     clean_names = []
     full_parts = []
+    bad_wife_words = ('子', '女', '长子', '次子', '三子', '四子', '长女', '次女', '三女', '四女', '孙', '孙女', '孙子', '电大', '次', '原', '两', '俩', '居', '在', '工作', '经商', '开公司')
     for m in matches:
-        cn = re.split(r'[，,；;（\(（\s]|生于|卒于|逝世于|居|嫁|卒', m.strip())[0].strip()
-        if cn and len(cn) <= 15 and cn not in ('子', '女', '长子', '次子', '三子', '四子', '长女', '次女', '三女', '四女', '孙', '孙女', '孙子', '电大', '次', '原') and cn not in clean_names:
+        cn = re.split(r'[，,；;（\(（\s]|生于|卒于|逝世于|居|嫁|卒|工作|毕业|现在', m.strip())[0].strip()
+        if cn and 1 <= len(cn) <= 10 and not any(bw in cn for bw in bad_wife_words) and cn not in clean_names:
             clean_names.append(cn)
             full_parts.append(m.strip())
     return " / ".join(clean_names), "；".join(full_parts)
@@ -143,8 +144,8 @@ def extract_daughters_rich(detail):
             d_name = re.sub(r'[（\(].*?[）\)]', '', it_raw).strip()
             # 去除前缀修饰
             d_name = re.sub(r'^(?:长女|次女|三女|四女|大女|小女|幼女|女)[一二三四五六七八九十\d]*[：:\s]*', '', d_name).strip()
-            # 剥离后续描述 (生于/嫁/适/夫/毕业/工作)
-            d_name = re.split(r'(?:生于|出生于|卒于|嫁|适|夫|配|工作|毕业|居|往|博士|硕士|大学|大专|高中|初中)', d_name)[0].strip()
+            # 剥离后续描述 (生于/嫁/适/夫/毕业/工作/任教)
+            d_name = re.split(r'(?:生于|出生于|卒于|嫁|适|夫|配|工作|毕业|居|往|博士|硕士|大学|大专|高中|初中|现在|任教|任职)', d_name)[0].strip()
             d_name = d_name.replace('江', '').strip()
             
             # 拆分金娇金琳等双字女儿名
@@ -154,19 +155,20 @@ def extract_daughters_rich(detail):
                     split_names = [d_name[:2], d_name[2:]]
 
             for pn in split_names:
-                # 过滤明显外姓或标点符号或单字数字
+                # 过滤明显外姓或标点符号或单字数字或大学城市
                 if pn and 1 <= len(pn) <= 4 and re.match(r'^[\u4e00-\u9fa5]+$', pn):
                     if not any(pn.startswith(sn) for sn in ['陈', '张', '李', '苏', '王', '刘', '黄', '林', '吴', '游', '沈', '熊', '卢', '巫']):
-                        if pn not in invalid_child_words and pn not in ('无', '早逝', '早夭', '出嗣', '止', '待考', '女', '男', '长', '次', '三', '四', '五', '生', '卒', '居', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'):
-                            if not any(d['name'] == pn for d in daughters_info):
-                                by = extract_general_birth_year(it_raw)
-                                daughters.append(pn)
-                                daughters_info.append({
-                                    'name': pn,
-                                    'full_name': f'江{pn}',
-                                    'info': it_raw,
-                                    'birth_year': by
-                                })
+                        if not any(city in pn for city in ['厦门', '福州', '泉州', '永安', '三明', '北京', '上海', '广州', '深圳', '苏州', '林学院', '大学', '学院', '中学', '小学', '任教']):
+                            if pn not in invalid_child_words and pn not in ('无', '早逝', '早夭', '出嗣', '止', '待考', '女', '男', '长', '次', '三', '四', '五', '生', '卒', '居', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'):
+                                if not any(d['name'] == pn for d in daughters_info):
+                                    by = extract_general_birth_year(it_raw)
+                                    daughters.append(pn)
+                                    daughters_info.append({
+                                        'name': pn,
+                                        'full_name': f'江{pn}',
+                                        'info': it_raw,
+                                        'birth_year': by
+                                    })
 
     return daughters, daughters_info
 
@@ -189,7 +191,8 @@ def extract_inline_children(detail):
     # 2. 提取形如 "子四女一：長子經琅、 次子經琳、三子經畧、四子經燦、女经瑄" 或 "子四：拱京..." 的列表项
     m_lists = re.finditer(r'(?:^|[；;。，,（\(\s])(?:(?:子|男)[一二三四五六七八九十\d]*(?:女[一二三四五六七八九十\d]*)?|生\d+子\d+女)[：:\s]+([^。;\n]+)', detail)
     for ml in m_lists:
-        content = ml.group(1).strip()
+        content = re.split(r'(?:(?<![之公长次三四五])女[一二三四五六七八九十\d]*[：:]|生女|育女|二女|三女|四女|女一|女二|女三|女四)', ml.group(1).strip())[0].strip()
+        if not content: continue
         # 保护括号
         prot = re.sub(r'[（\(](.*?)[）\)]', lambda m: '（' + m.group(1).replace('、', '##').replace('，', '##').replace(',', '##').replace('；', '##') + '）', content)
         items = re.split(r'[、，,\s/；;]+', prot)
@@ -215,10 +218,9 @@ def extract_inline_children(detail):
             clean_n = re.split(r'(?:生于|卒于|妻|配|适|嫁|工作于|毕业于|曾任)', clean_n)[0].strip()
             clean_n = clean_child_name(clean_n)
             if clean_n and 1 <= len(clean_n) <= 4 and not re.search(r'[\d\?？]', clean_n):
-                if not re.match(r'^(?:女|女[一二三四五六七八九十\d]+|[一二三四五六七八九十\d]+)$', clean_n):
-                    if not clean_n.startswith('女'):
+                if not re.search(r'^(?:[一二三四五六七八九十\d]*女[一二三四五六七八九十\d]*|[一二三四五六七八九十\d]+)$', clean_n):
+                    if not clean_n.startswith('女') and not clean_n.endswith('女'):
                         if clean_n not in invalid_child_words and clean_n not in ('无', '早逝', '早夭', '出嗣', '止', '生于', '卒于', '待考', '子', '女', '生'):
-                            # 避免外层添加内嵌的孙辈
                             if not any(c['name'] == clean_n for c in children):
                                 children.append({'name': clean_n, 'wife': '', 'raw': clean_n, 'birth_year': None, 'sub_children': sub_children})
                         
@@ -249,8 +251,15 @@ for t in consolidated_lines:
         clean_name = clean_child_name(name.replace('公', ''))
         name = clean_name
 
-        is_female_line = bool(re.search(r'(?:之女|公之女|公长女|公次女|公三女|公四女|生女|育女|大女|长女|次女|三女|四女|女一|女二|女三|女四|二女|三女|四女)', detail.split('。')[0]))
-        gender = 'female' if is_female_line else 'male'
+        head_clause = re.split(r'[，,。；;]', detail.strip())[0]
+        is_self_son = bool(re.search(r'(?:之子|公子|长子|次子|三子|四子|五子|六子|七子|八子|九子|十子|長子|嗣子|继子|子|男)', head_clause))
+        is_female_line = bool(re.search(r'(?:之女|公之女|公长女|公次女|公三女|公四女|大女|长女|次女|三女|四女|女)', head_clause))
+        if is_self_son:
+            gender = 'male'
+        elif is_female_line:
+            gender = 'female'
+        else:
+            gender = 'male'
 
         if clean_name == '筱钰' and gen == 30:
             if '曾德亮' not in detail:
