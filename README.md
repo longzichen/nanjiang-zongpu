@@ -31,3 +31,9 @@
 1. 在本仓库顶部点击 **Settings -> Pages**；
 2. 在 **Branch** 下拉菜单中选择 `main`，文件夹选择 `/ (root)`，点击 **Save**；
 3. 几秒钟后即可获得公网访问网址：`https://longzichen.github.io/nanjiang-zongpu/`！
+
+---
+
+## 学习演示
+
+本节是 2026-10-16 由云端助手做的演示改动，用来说明如何在云端只改文档并提交 Pull Request。
